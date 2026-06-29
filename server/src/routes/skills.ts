@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db.js';
 import { requireAuth } from '../auth/routes.js';
+import { validateSkillData } from '../skillValidation.js';
 
 export async function skillRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', requireAuth);
@@ -110,6 +111,11 @@ export async function skillRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: 'name y data requeridos' });
       }
 
+      const validationError = validateSkillData(data);
+      if (validationError) {
+        return reply.code(400).send({ error: validationError });
+      }
+
       const id = uuidv4();
       db.prepare('INSERT INTO skills (id, user_id, name, data) VALUES (?, ?, ?, ?)').run(
         id,
@@ -133,6 +139,12 @@ export async function skillRoutes(app: FastifyInstance): Promise<void> {
       if (!row) return reply.code(404).send({ error: 'Skill no encontrada' });
 
       const { name, data } = request.body ?? {};
+      if (data) {
+        const validationError = validateSkillData(data);
+        if (validationError) {
+          return reply.code(400).send({ error: validationError });
+        }
+      }
       if (name && data) {
         db.prepare('UPDATE skills SET name = ?, data = ? WHERE id = ?').run(
           name,

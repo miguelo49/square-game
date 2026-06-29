@@ -37,6 +37,7 @@ export function PlayLevels() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [myBest, setMyBest] = useState<{ timeMs: number; deaths: number } | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   const levels =
@@ -73,6 +74,7 @@ export function PlayLevels() {
         authorNickname: l.authorNickname,
       }))
     );
+    setFavoriteIds(new Set(fav.map((l) => l.id)));
   }, []);
 
   const loadLevelMeta = useCallback(async (levelId: string) => {
@@ -167,11 +169,17 @@ export function PlayLevels() {
     [selectedId]
   );
 
-  const toggleFavorite = async () => {
-    if (!selectedId) return;
-    const res = await api.levels.favorite(selectedId);
-    setIsFavorite(res.isFavorite);
+  const toggleFavorite = async (levelId?: string) => {
+    const id = levelId ?? selectedId;
+    if (!id) return;
+    const res = await api.levels.favorite(id);
+    if (id === selectedId) setIsFavorite(res.isFavorite);
     await loadLevels();
+  };
+
+  const toggleFavoriteInline = async (e: React.MouseEvent, levelId: string) => {
+    e.stopPropagation();
+    await toggleFavorite(levelId);
   };
 
   const replay = () => {
@@ -222,33 +230,48 @@ export function PlayLevels() {
               className={`retro-btn small ${tab === 'favorites' ? 'active' : ''}`}
               onClick={() => handleTabChange('favorites')}
             >
-              Favoritos
+              Favoritos ({favoriteLevels.length})
             </button>
           </div>
 
-          {levels.length === 0 && (
-            <p className="empty-list">
-              {tab === 'mine'
-                ? 'No tienes niveles aún.'
-                : tab === 'community'
-                  ? 'No hay niveles públicos.'
-                  : 'Sin favoritos — guarda niveles con ★'}
-            </p>
-          )}
+          <div className="level-list-scroll">
+            {levels.length === 0 && (
+              <p className="empty-list">
+                {tab === 'mine'
+                  ? 'No tienes niveles aún.'
+                  : tab === 'community'
+                    ? 'No hay niveles públicos.'
+                    : 'Sin favoritos. Marca niveles con ☆ en Comunidad o Mis niveles.'}
+              </p>
+            )}
 
-          {levels.map((lvl) => (
-            <button
-              key={lvl.id}
-              className={`retro-btn level-item ${selectedId === lvl.id ? 'active' : ''}`}
-              onClick={() => selectLevel(lvl)}
-            >
-              {lvl.isDemo && '★ '}
-              {lvl.name}
-              {lvl.authorNickname && (
-                <span className="level-author"> — {lvl.authorNickname}</span>
-              )}
-            </button>
-          ))}
+            {levels.map((lvl) => (
+              <div
+                key={lvl.id}
+                className={`level-row ${selectedId === lvl.id ? 'active' : ''}`}
+              >
+                <button
+                  type="button"
+                  className={`level-star-btn ${favoriteIds.has(lvl.id) ? 'active' : ''}`}
+                  title={favoriteIds.has(lvl.id) ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+                  onClick={(e) => void toggleFavoriteInline(e, lvl.id)}
+                >
+                  {favoriteIds.has(lvl.id) ? '★' : '☆'}
+                </button>
+                <button
+                  type="button"
+                  className={`retro-btn level-item ${selectedId === lvl.id ? 'active' : ''}`}
+                  onClick={() => selectLevel(lvl)}
+                >
+                  {lvl.isDemo && <span className="demo-badge">DEMO</span>}
+                  <span className="level-item-name">{lvl.name}</span>
+                  {lvl.authorNickname && (
+                    <span className="level-author"> — {lvl.authorNickname}</span>
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
 
           {selectedId && (
             <div className="level-sidebar-meta">
@@ -256,7 +279,7 @@ export function PlayLevels() {
                 className={`retro-btn small favorite-btn ${isFavorite ? 'active' : ''}`}
                 onClick={() => void toggleFavorite()}
               >
-                {isFavorite ? '★ Guardado' : '☆ Guardar nivel'}
+                {isFavorite ? '★ En favoritos' : '☆ Guardar nivel'}
               </button>
 
               {myBest && (

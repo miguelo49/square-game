@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import type { AssetSchema, AssetAnimClip } from '../../types';
 import { assetAnimKey, hasClipAnims, playSpriteAnim } from '../utils/textures';
 
-type OneShotClip = 'shoot' | 'hurt';
+type OneShotClip = AssetAnimClip;
 
 export class AnimationController {
   private sprite: Phaser.Physics.Arcade.Sprite;
@@ -26,7 +26,7 @@ export class AnimationController {
     this.asset = asset;
   }
 
-  triggerOneShot(clip: OneShotClip): void {
+  triggerOneShot(clip: AssetAnimClip): void {
     if (!this.asset || !hasClipAnims(this.asset)) return;
     const key = assetAnimKey(this.asset, clip);
     if (!key || !this.sprite.scene.anims.exists(key)) return;

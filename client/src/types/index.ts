@@ -10,7 +10,8 @@ export type SkillActionType =
   | 'impulse'
   | 'shoot'
   | 'scale'
-  | 'rotate';
+  | 'rotate'
+  | 'custom';
 
 export type AssetAnimClip = 'idle' | 'walk' | 'jump' | 'fall' | 'shoot' | 'hurt';
 
@@ -110,6 +111,9 @@ export interface SkillAction {
   projectileAssetId?: string;
   projectileSpeed?: number;
   projectileLife?: number;
+  animClip?: AssetAnimClip;
+  customName?: string;
+  script?: string;
 }
 
 export interface SkillCondition {
@@ -122,6 +126,7 @@ export interface SkillSchema {
   trigger: SkillTrigger;
   actions: SkillAction[];
   conditions?: SkillCondition[];
+  animClip?: AssetAnimClip;
 }
 
 export interface AssetSchema {

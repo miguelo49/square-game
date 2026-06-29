@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
-import type { SkillSchema } from '../../types';
+import type { SkillAction, SkillSchema } from '../../types';
 import { resolvePhaserKeyCode } from '../utils/phaserKeys';
 import type { ProjectileManager } from './ProjectileManager';
 import type { AnimationController } from './AnimationController';
+import { ONE_SHOT_CLIPS, resolveActionAnimClip } from './skillAnimDefaults';
+import { runSkillScript } from './SkillScriptRunner';
 
 interface CooldownState {
   [skillId: string]: number;
@@ -90,6 +92,13 @@ export class SkillInterpreter {
     return true;
   }
 
+  private triggerActionAnim(action: SkillAction, skill: SkillSchema): void {
+    const clip = resolveActionAnimClip(action, skill.animClip);
+    if (clip && ONE_SHOT_CLIPS.has(clip)) {
+      this.animCtrl?.triggerOneShot(clip);
+    }
+  }
+
   private executeActions(skill: SkillSchema): void {
     for (const action of skill.actions) {
       switch (action.type) {
@@ -97,6 +106,7 @@ export class SkillInterpreter {
           if (!skill.conditions?.some((c) => c.type === 'onGround') || this.onGroundFn()) {
             this.body.setVelocityY(-(action.force ?? 400));
           }
+          this.triggerActionAnim(action, skill);
           break;
         case 'impulse':
           if (action.axis === 'x') {
@@ -104,6 +114,7 @@ export class SkillInterpreter {
           } else {
             this.body.setVelocityY(-(action.force ?? 300));
           }
+          this.triggerActionAnim(action, skill);
           break;
         case 'move':
           if (action.axis === 'x') {
@@ -118,6 +129,7 @@ export class SkillInterpreter {
           const dir = this.body.velocity.x >= 0 ? 1 : -1;
           this.body.setVelocityX(dir * (action.distance ?? 120) * 4);
           this.cooldowns[skill.id] = cd;
+          this.triggerActionAnim(action, skill);
           break;
         }
         case 'gravity':
@@ -164,10 +176,27 @@ export class SkillInterpreter {
             action.projectileSpeed ?? 420,
             action.projectileLife ?? 2000
           );
-          this.animCtrl?.triggerOneShot('shoot');
+          this.triggerActionAnim(action, skill);
           this.cooldowns[skill.id] = cd;
           break;
         }
+        case 'custom':
+          if (action.script) {
+            runSkillScript(action.script, {
+              body: this.body,
+              sprite: this.sprite,
+              onGroundFn: this.onGroundFn,
+              projectiles: this.projectiles,
+              animCtrl: this.animCtrl,
+              skillId: skill.id,
+              getCooldown: (id) => this.cooldowns[id] ?? 0,
+              setCooldownFor: (id, ms) => {
+                this.cooldowns[id] = ms;
+              },
+            });
+          }
+          this.triggerActionAnim(action, skill);
+          break;
       }
     }
   }

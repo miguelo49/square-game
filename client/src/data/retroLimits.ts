@@ -44,4 +44,5 @@ export const ACTION_OPTIONS = [
   { label: 'Escalar tamaño', value: 'scale' },
   { label: 'Rotar', value: 'rotate' },
   { label: 'Disparar', value: 'shoot' },
+  { label: 'Personalizado', value: 'custom' },
 ];

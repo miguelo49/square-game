@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { useGameContent } from '../hooks/useGameContent';
-import type { SkillSchema, SkillAction, SkillActionType } from '../types';
+import type { SkillSchema, SkillAction, SkillActionType, AssetAnimClip } from '../types';
+import { ASSET_ANIM_CLIPS } from '../types';
 import { KEY_OPTIONS, ACTION_OPTIONS } from '../data/retroLimits';
+import { SKILL_PRESETS, clonePresetSkill } from '../data/skillPresets';
+import { validateSkillScript } from '../game/systems/SkillScriptRunner';
 import { api } from '../api/client';
 
-const DEFAULT_ACTION = (): SkillAction => ({ type: 'jump', force: 420 });
+const DEFAULT_ACTION = (): SkillAction => ({ type: 'jump', force: 420, animClip: 'jump' });
 
 export function SkillsHub() {
   const navigate = useNavigate();
@@ -34,6 +37,13 @@ export function SkillsHub() {
       actions: [DEFAULT_ACTION()],
       conditions: [],
     });
+    setError('');
+  };
+
+  const usePreset = (presetId: string) => {
+    const preset = SKILL_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    setEditing(clonePresetSkill(preset, uuidv4()));
     setError('');
   };
 
@@ -76,6 +86,19 @@ export function SkillsHub() {
   const saveSkill = async () => {
     if (!editing) return;
     setError('');
+    for (const action of editing.actions) {
+      if (action.type === 'custom' && action.script) {
+        const scriptErr = validateSkillScript(action.script);
+        if (scriptErr) {
+          setError(scriptErr);
+          return;
+        }
+        if (!action.customName?.trim()) {
+          setError('Acción personalizada requiere nombre');
+          return;
+        }
+      }
+    }
     try {
       const existing = skills.find((s) => s.id === editing.id);
       if (existing) {
@@ -110,9 +133,20 @@ export function SkillsHub() {
         <select
           className="retro-input"
           value={action.type}
-          onChange={(e) =>
-            updateAction(idx, { type: e.target.value as SkillActionType })
-          }
+          onChange={(e) => {
+            const type = e.target.value as SkillActionType;
+            if (type === 'custom') {
+              updateAction(idx, {
+                type,
+                customName: action.customName ?? 'Mi acción',
+                script:
+                  action.script ??
+                  'if (ctx.onGround) ctx.jump(420);\nelse ctx.impulse("y", 320);\nctx.playAnim("jump");',
+              });
+            } else {
+              updateAction(idx, { type });
+            }
+          }}
         >
           {ACTION_OPTIONS.map((a) => (
             <option key={a.value} value={a.value}>
@@ -294,6 +328,54 @@ export function SkillsHub() {
           </label>
         </>
       )}
+      {action.type === 'custom' && (
+        <>
+          <label>
+            Nombre de la acción
+            <input
+              className="retro-input"
+              value={action.customName ?? ''}
+              onChange={(e) => updateAction(idx, { customName: e.target.value })}
+              placeholder="Ej: Wall jump"
+            />
+          </label>
+          <label>
+            Script (ctx)
+            <textarea
+              className="retro-input script-area"
+              rows={6}
+              value={action.script ?? ''}
+              onChange={(e) => updateAction(idx, { script: e.target.value })}
+              placeholder={'if (ctx.onGround) ctx.jump(420);\nctx.playAnim("jump");'}
+            />
+          </label>
+          <p className="hint script-hint">
+            ctx: onGround, vx, vy, setVelocity, jump, impulse, dash, shoot, playAnim,
+            cooldownReady, setCooldown
+          </p>
+        </>
+      )}
+      {action.type !== 'move' && (
+        <label>
+          Animación al activar
+          <select
+            className="retro-input"
+            value={action.animClip ?? ''}
+            onChange={(e) =>
+              updateAction(idx, {
+                animClip: (e.target.value || undefined) as AssetAnimClip | undefined,
+              })
+            }
+          >
+            <option value="">— Por defecto —</option>
+            {ASSET_ANIM_CLIPS.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
     </div>
   );
 
@@ -337,6 +419,23 @@ export function SkillsHub() {
         </aside>
 
         <div className="skills-hub-editor">
+          <div className="skill-presets">
+            <h3>Plantillas</h3>
+            <div className="preset-grid">
+              {SKILL_PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="retro-btn small preset-card"
+                  onClick={() => usePreset(p.id)}
+                  title={p.description}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {editing ? (
             <div className="skill-form full">
               <h3>{editing.name}</h3>
@@ -381,6 +480,26 @@ export function SkillsHub() {
                   <option value="keydown">Al presionar</option>
                   <option value="hold">Mantener</option>
                   <option value="keyup">Al soltar</option>
+                </select>
+              </label>
+
+              <label>
+                Animación por defecto (skill)
+                <select
+                  className="retro-input"
+                  value={editing.animClip ?? ''}
+                  onChange={(e) =>
+                    patchEditing({
+                      animClip: (e.target.value || undefined) as AssetAnimClip | undefined,
+                    })
+                  }
+                >
+                  <option value="">— Ninguna —</option>
+                  {ASSET_ANIM_CLIPS.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
                 </select>
               </label>
 

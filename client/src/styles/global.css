@@ -242,29 +242,91 @@ label {
 }
 
 .level-list {
-  width: 200px;
+  width: 280px;
   background: var(--bg-panel);
   border-right: 3px solid var(--border);
   padding: 12px;
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
+}
+
+.level-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.level-row {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.level-row.active .level-item {
+  border-color: var(--accent);
+}
+
+.level-star-btn {
+  flex-shrink: 0;
+  width: 28px;
+  min-width: 28px;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  color: #888;
+  cursor: pointer;
+  font-family: var(--font);
+}
+
+.level-star-btn:hover,
+.level-star-btn.active {
+  border-color: gold;
+  color: gold;
 }
 
 .level-item {
   text-align: left;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.level-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.demo-badge {
+  font-size: 6px;
+  padding: 2px 4px;
+  background: var(--accent);
+  color: var(--bg);
+  border-radius: 2px;
+  flex-shrink: 0;
 }
 
 .level-tabs {
   display: flex;
+  flex-direction: column;
   gap: 4px;
   margin-bottom: 4px;
+  flex-shrink: 0;
 }
 
 .level-tabs .retro-btn {
-  flex: 1;
+  width: 100%;
+  text-align: left;
 }
 
 .level-author {
@@ -828,9 +890,12 @@ label {
 }
 
 .level-sidebar-meta {
-  margin-top: 12px;
+  flex-shrink: 0;
+  margin-top: auto;
   padding-top: 12px;
   border-top: 2px solid var(--border);
+  max-height: 45%;
+  overflow-y: auto;
 }
 
 .my-best {
@@ -886,4 +951,59 @@ label {
   width: 100%;
   height: auto;
   border: 1px solid var(--border);
+}
+
+.skill-presets {
+  margin-bottom: 16px;
+}
+
+.preset-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.preset-card {
+  font-size: 7px;
+}
+
+.skill-quick-presets {
+  margin-bottom: 10px;
+}
+
+.quick-label {
+  font-size: 7px;
+  color: var(--accent);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.preset-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.preset-chip {
+  font-size: 6px;
+}
+
+.skill-anim-tag {
+  font-size: 6px;
+  color: var(--accent);
+  opacity: 0.85;
+}
+
+.script-area {
+  font-family: monospace;
+  font-size: 8px;
+  resize: vertical;
+  min-height: 80px;
+}
+
+.script-hint {
+  font-size: 6px;
+  line-height: 1.4;
+  margin-top: 4px;
 }

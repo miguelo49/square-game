@@ -567,6 +567,7 @@ export class GameScene extends Phaser.Scene {
   private handleDeath(): void {
     if (this.won) return;
     this.deathCount++;
+    this.playerAnimCtrl?.triggerOneShot('hurt');
     this.player.setPosition(this.level.spawn.x, this.level.spawn.y);
     this.player.setVelocity(0, 0);
     this.callbacks.onDeath?.();
