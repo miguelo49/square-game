@@ -6,7 +6,9 @@ import { MainMenu } from './routes/MainMenu';
 import { PlayLevels } from './routes/PlayLevels';
 import { LevelEditor } from './routes/LevelEditor';
 import { AssetEditor } from './routes/AssetEditor';
+import { MusicHub } from './routes/MusicHub';
 import { MusicEditorPage } from './routes/MusicEditor';
+import { SkillsHub } from './routes/SkillsHub';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore();
@@ -69,7 +71,23 @@ function App() {
           path="/music"
           element={
             <ProtectedRoute>
+              <MusicHub />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/music/level"
+          element={
+            <ProtectedRoute>
               <MusicEditorPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/skills"
+          element={
+            <ProtectedRoute>
+              <SkillsHub />
             </ProtectedRoute>
           }
         />

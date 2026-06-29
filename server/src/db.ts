@@ -61,6 +61,16 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_skills_user ON skills(user_id);
+
+  CREATE TABLE IF NOT EXISTS music_tracks (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    data TEXT NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_music_user ON music_tracks(user_id);
 `);
 
 export interface UserRow {
@@ -90,6 +100,14 @@ export interface AssetRow {
 }
 
 export interface SkillRow {
+  id: string;
+  user_id: string;
+  name: string;
+  data: string;
+  created_at: number;
+}
+
+export interface MusicTrackRow {
   id: string;
   user_id: string;
   name: string;

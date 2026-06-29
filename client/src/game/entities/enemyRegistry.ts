@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { EnemyDef, EnemyBehavior, SelectedEnemyConfig } from '../../types';
+import type { EnemyDef, EnemyBehavior, SelectedEnemyConfig, AssetSchema } from '../../types';
 import { TriangleEnemy } from './TriangleEnemy';
 
 export interface EnemyPreset {
@@ -38,6 +38,10 @@ export function presetToEnemyDef(
   };
 }
 
-export function createEnemy(scene: Phaser.Scene, def: EnemyDef): TriangleEnemy {
-  return new TriangleEnemy(scene, def);
+export function createEnemy(
+  scene: Phaser.Scene,
+  def: EnemyDef,
+  assets: AssetSchema[] = []
+): TriangleEnemy {
+  return new TriangleEnemy(scene, def, assets);
 }

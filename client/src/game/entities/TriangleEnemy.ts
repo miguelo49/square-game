@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
-import type { EnemyDef } from '../../types';
+import type { EnemyDef, AssetSchema } from '../../types';
+import { assetTextureKey } from '../utils/textures';
+import { initSpriteAnimation, AnimationController } from '../systems/AnimationController';
 
 export class TriangleEnemy extends Phaser.Physics.Arcade.Sprite {
   private behavior: EnemyDef['behavior'];
@@ -9,12 +11,19 @@ export class TriangleEnemy extends Phaser.Physics.Arcade.Sprite {
   private chaseRange = 320;
   private hopTimer = 0;
   private hopInterval = 1200;
+  private animCtrl?: AnimationController | null;
 
-  constructor(scene: Phaser.Scene, def: EnemyDef) {
+  constructor(scene: Phaser.Scene, def: EnemyDef, assets: AssetSchema[] = []) {
+    const asset = def.assetId ? assets.find((a) => a.id === def.assetId) : undefined;
     const baseKey = def.assetId ? `asset-${def.assetId}` : 'enemy-default';
-    const sheetKey = def.assetId ? `asset-${def.assetId}-sheet` : null;
-    const tex =
-      sheetKey && scene.textures.exists(sheetKey) ? sheetKey : baseKey;
+    let tex = baseKey;
+    if (asset) {
+      tex = assetTextureKey(asset, 'idle');
+      if (!scene.textures.exists(tex)) tex = baseKey;
+    } else if (def.assetId) {
+      const idleSheet = `asset-${def.assetId}-idle-sheet`;
+      if (scene.textures.exists(idleSheet)) tex = idleSheet;
+    }
     super(scene, def.x, def.y, tex);
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -32,13 +41,14 @@ export class TriangleEnemy extends Phaser.Physics.Arcade.Sprite {
     this.patrolRange = def.patrolRange ?? 128;
     this.startX = def.x;
 
-    const animKey = def.assetId ? `asset-${def.assetId}-anim` : null;
-    if (animKey && scene.anims.exists(animKey)) {
-      this.play(animKey);
+    this.animCtrl = initSpriteAnimation(this, asset);
+    if (!this.animCtrl) {
+      const legacy = def.assetId ? `asset-${def.assetId}-anim` : null;
+      if (legacy && scene.anims.exists(legacy)) this.play(legacy);
     }
   }
 
-  update(player?: Phaser.Physics.Arcade.Sprite, delta = 16): void {
+  update(player?: Phaser.Physics.Arcade.Sprite, delta = 16, time = 0): void {
     switch (this.behavior) {
       case 'patrol':
         this.patrol();
@@ -59,6 +69,7 @@ export class TriangleEnemy extends Phaser.Physics.Arcade.Sprite {
         this.patrol();
         break;
     }
+    this.animCtrl?.update(time);
   }
 
   private patrol(): void {

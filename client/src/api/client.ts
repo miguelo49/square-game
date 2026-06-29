@@ -116,4 +116,22 @@ export const api = {
     delete: (id: string) =>
       request<{ ok: boolean }>(`/skills/${id}`, { method: 'DELETE' }),
   },
+  music: {
+    list: () =>
+      request<
+        Array<{ id: string; name: string; data: import('../types').MusicSchema }>
+      >('/music'),
+    create: (name: string, data: import('../types').MusicSchema) =>
+      request<{ id: string }>('/music', {
+        method: 'POST',
+        body: JSON.stringify({ name, data }),
+      }),
+    update: (id: string, name: string, data: import('../types').MusicSchema) =>
+      request<{ ok: boolean }>(`/music/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name, data }),
+      }),
+    delete: (id: string) =>
+      request<{ ok: boolean }>(`/music/${id}`, { method: 'DELETE' }),
+  },
 };

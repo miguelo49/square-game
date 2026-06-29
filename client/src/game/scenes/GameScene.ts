@@ -12,10 +12,12 @@ import {
   createDefaultEnemyTexture,
   createSpawnMarkerTexture,
   createPortalTexture,
-  registerAsset,
+  createProjectileTexture,
+  registerAssetClips,
   assetTextureKey,
-  playSpriteAnim,
 } from '../utils/textures';
+import { initSpriteAnimation, AnimationController } from '../systems/AnimationController';
+import { ProjectileManager } from '../systems/ProjectileManager';
 import { migrateLevel, snapToPlatformSurface, PORTAL_H } from '../utils/placement';
 import { GAME_CAPTURE_KEYS } from '../utils/phaserKeys';
 import { GRID_SNAP } from '../../data/retroLimits';
@@ -56,6 +58,10 @@ export class GameScene extends Phaser.Scene {
   private selectedEnemy: SelectedEnemyConfig = DEFAULT_ENEMY_SELECTION;
   private platformSprites: Map<string, Phaser.GameObjects.Rectangle> = new Map();
   private deleteHighlight?: Phaser.GameObjects.Rectangle;
+  private selectionHighlight?: Phaser.GameObjects.Rectangle;
+  private selectedEntityId: string | null = null;
+  private playerAnimCtrl?: AnimationController | null;
+  private projectileManager?: ProjectileManager;
   private won = false;
 
   constructor() {
@@ -70,6 +76,7 @@ export class GameScene extends Phaser.Scene {
     callbacks?: GameSceneCallbacks;
     editorTool?: string;
     selectedEnemy?: SelectedEnemyConfig;
+    selectedEntityId?: string | null;
   }): void {
     this.level = migrateLevel(data.level);
     this.skills = data.skills ?? [];
@@ -78,6 +85,7 @@ export class GameScene extends Phaser.Scene {
     this.callbacks = data.callbacks ?? {};
     this.editorTool = data.editorTool ?? 'select';
     this.selectedEnemy = data.selectedEnemy ?? DEFAULT_ENEMY_SELECTION;
+    this.selectedEntityId = data.selectedEntityId ?? null;
     this.won = false;
   }
 
@@ -88,6 +96,13 @@ export class GameScene extends Phaser.Scene {
     this.editorGhost = undefined;
     this.deleteHighlight?.destroy();
     this.deleteHighlight = undefined;
+    this.selectionHighlight?.destroy();
+    this.selectionHighlight = undefined;
+    if (this.projectileManager) {
+      this.projectileManager.destroy();
+      this.projectileManager = undefined;
+    }
+    this.playerAnimCtrl = undefined;
     this.portalZone?.destroy(true);
     this.portalZone = undefined;
     this.enemyGroup = undefined;
@@ -97,9 +112,10 @@ export class GameScene extends Phaser.Scene {
     createDefaultEnemyTexture(this);
     createSpawnMarkerTexture(this);
     createPortalTexture(this);
+    createProjectileTexture(this);
 
     for (const asset of this.assets) {
-      registerAsset(this, asset);
+      registerAssetClips(this, asset);
     }
 
     this.physics.world.setBounds(0, 0, this.level.width, this.level.height);
@@ -116,6 +132,11 @@ export class GameScene extends Phaser.Scene {
       this.deleteHighlight.setStrokeStyle(2, 0xff4444);
       this.deleteHighlight.setVisible(false);
       this.deleteHighlight.setDepth(1000);
+      this.selectionHighlight = this.add.rectangle(0, 0, 32, 32);
+      this.selectionHighlight.setStrokeStyle(3, 0xffff00);
+      this.selectionHighlight.setFillStyle(0xffff00, 0.15);
+      this.selectionHighlight.setVisible(false);
+      this.selectionHighlight.setDepth(999);
     }
 
     this.platforms = this.physics.add.staticGroup();
@@ -132,7 +153,7 @@ export class GameScene extends Phaser.Scene {
     this.player.body!.setSize(28, 28);
     this.player.setCollideWorldBounds(true);
     this.player.setBounce(0.05);
-    playSpriteAnim(this.player, playerAsset);
+    this.playerAnimCtrl = initSpriteAnimation(this.player, playerAsset);
 
     if (this.mode === 'play') {
       this.player.setVisible(true);
@@ -144,12 +165,16 @@ export class GameScene extends Phaser.Scene {
 
     this.skillInterpreter = new SkillInterpreter(
       this,
-      this.player.body as Phaser.Physics.Arcade.Body,
+      this.player,
       () => (this.player.body as Phaser.Physics.Arcade.Body).blocked.down
     );
+    this.skillInterpreter.setAnimationController(this.playerAnimCtrl ?? undefined);
     this.skillInterpreter.loadSkills(this.skills);
 
     if (this.mode === 'play') {
+      this.projectileManager = new ProjectileManager(this);
+      this.projectileManager.setAssets(this.assets);
+      this.skillInterpreter.setProjectileManager(this.projectileManager);
       this.input.keyboard?.addCapture([...GAME_CAPTURE_KEYS]);
       this.setupPlayPhysics();
       this.cameraCtrl.followTarget(this.player);
@@ -170,12 +195,32 @@ export class GameScene extends Phaser.Scene {
     this.events.on('set-selected-enemy', (cfg: SelectedEnemyConfig) => {
       this.selectedEnemy = cfg;
     }, this);
+    this.events.on('set-selected-entity', (id: string | null) => {
+      this.selectedEntityId = id;
+      this.updateSelectionHighlight();
+    }, this);
+  }
+
+  private updateSelectionHighlight(): void {
+    if (!this.selectionHighlight || this.mode !== 'edit') return;
+    if (!this.selectedEntityId) {
+      this.selectionHighlight.setVisible(false);
+      return;
+    }
+    const e = this.level.enemies.find((en) => en.id === this.selectedEntityId);
+    if (!e) {
+      this.selectionHighlight.setVisible(false);
+      return;
+    }
+    this.selectionHighlight.setPosition(e.x, e.y);
+    this.selectionHighlight.setSize(32, 32);
+    this.selectionHighlight.setVisible(true);
   }
 
   private enemyTexture(def: { assetId?: string }): string {
     if (def.assetId) {
       const asset = this.assets.find((a) => a.id === def.assetId);
-      if (asset) return assetTextureKey(asset);
+      if (asset) return assetTextureKey(asset, 'idle');
       return `asset-${def.assetId}`;
     }
     return 'enemy-default';
@@ -270,10 +315,12 @@ export class GameScene extends Phaser.Scene {
         img.setData('id', e.id);
         this.editorEnemySprites.push(img);
       } else {
-        const enemy = createEnemy(this, e);
+        const enemy = createEnemy(this, e, this.assets);
         this.enemies.push(enemy);
       }
     }
+
+    this.updateSelectionHighlight();
 
     if (this.mode === 'edit') {
       this.spawnMarker = this.add.image(
@@ -326,6 +373,8 @@ export class GameScene extends Phaser.Scene {
 
     this.physics.add.collider(this.player, this.platforms);
     this.physics.add.collider(this.enemyGroup, this.platforms);
+
+    this.projectileManager?.setupColliders(this.platforms, this.enemies);
 
     for (const enemy of this.enemies) {
       this.physics.add.overlap(this.player, enemy, () => {
@@ -398,7 +447,19 @@ export class GameScene extends Phaser.Scene {
         return;
       }
 
-      if (this.editorTool === 'select') return;
+      if (this.editorTool === 'select') {
+        const hit = this.findEntityAt(world.x, world.y);
+        if (hit?.type === 'enemy') {
+          this.selectedEntityId = hit.id;
+          this.updateSelectionHighlight();
+          this.callbacks.onEditorSelect?.('enemy', hit.id);
+        } else {
+          this.selectedEntityId = null;
+          this.updateSelectionHighlight();
+          this.callbacks.onEditorSelect?.('', '');
+        }
+        return;
+      }
 
       const x = Math.round(world.x / GRID_SNAP) * GRID_SNAP;
       const y = Math.round(world.y / GRID_SNAP) * GRID_SNAP;
@@ -520,8 +581,10 @@ export class GameScene extends Phaser.Scene {
     if (this.mode === 'play' && !this.won) {
       this.skillInterpreter.update(_time, delta);
       this.skillInterpreter.applyFriction();
+      this.playerAnimCtrl?.update(_time);
+      this.projectileManager?.update(delta);
       for (const enemy of this.enemies) {
-        enemy.update(this.player, delta);
+        enemy.update(this.player, delta, _time);
       }
     }
 
@@ -546,5 +609,10 @@ export class GameScene extends Phaser.Scene {
     this.editorGrid?.destroy();
     this.editorGhost?.destroy();
     this.deleteHighlight?.destroy();
+    this.selectionHighlight?.destroy();
+    if (this.projectileManager) {
+      this.projectileManager.destroy();
+      this.projectileManager = undefined;
+    }
   }
 }

@@ -12,7 +12,9 @@ interface GameCanvasProps {
   mode?: GameMode;
   editorTool?: string;
   selectedEnemy?: SelectedEnemyConfig;
+  selectedEntityId?: string | null;
   onLevelChange?: (level: LevelSchema) => void;
+  onEditorSelect?: (type: string, id: string) => void;
   onDeath?: () => void;
   onWin?: () => void;
 }
@@ -24,7 +26,9 @@ export function GameCanvas({
   mode = 'play',
   editorTool = 'select',
   selectedEnemy,
+  selectedEntityId,
   onLevelChange,
+  onEditorSelect,
   onDeath,
   onWin,
 }: GameCanvasProps) {
@@ -38,8 +42,10 @@ export function GameCanvas({
     mode,
     editorTool,
     selectedEnemy,
+    selectedEntityId,
     onDeath,
     onWin,
+    onEditorSelect,
   });
 
   propsRef.current = {
@@ -49,8 +55,10 @@ export function GameCanvas({
     mode,
     editorTool,
     selectedEnemy,
+    selectedEntityId,
     onDeath,
     onWin,
+    onEditorSelect,
   };
 
   useEffect(() => {
@@ -71,7 +79,12 @@ export function GameCanvas({
         mode: p.mode,
         editorTool: p.editorTool,
         selectedEnemy: p.selectedEnemy,
-        callbacks: { onDeath: p.onDeath, onWin: p.onWin },
+        selectedEntityId: p.selectedEntityId,
+        callbacks: {
+          onDeath: p.onDeath,
+          onWin: p.onWin,
+          onEditorSelect: p.onEditorSelect,
+        },
       });
     };
 
@@ -110,7 +123,12 @@ export function GameCanvas({
       mode: p.mode,
       editorTool: p.editorTool,
       selectedEnemy: p.selectedEnemy,
-      callbacks: { onDeath: p.onDeath, onWin: p.onWin },
+      selectedEntityId: p.selectedEntityId,
+      callbacks: {
+        onDeath: p.onDeath,
+        onWin: p.onWin,
+        onEditorSelect: p.onEditorSelect,
+      },
     };
     if (scene?.scene.isActive()) {
       scene.scene.restart(payload);
@@ -129,6 +147,13 @@ export function GameCanvas({
     const scene = game.scene.getScene('GameScene');
     scene?.events.emit('set-selected-enemy', selectedEnemy);
   }, [selectedEnemy]);
+
+  useEffect(() => {
+    const game = gameRef.current;
+    if (!game?.isBooted) return;
+    const scene = game.scene.getScene('GameScene');
+    scene?.events.emit('set-selected-entity', selectedEntityId ?? null);
+  }, [selectedEntityId]);
 
   useEffect(() => {
     if (!musicRef.current) musicRef.current = new MusicPlayer();

@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import type { SkillSchema } from '../../types';
 import { toPhaserKey } from '../utils/phaserKeys';
+import type { ProjectileManager } from './ProjectileManager';
+import type { AnimationController } from './AnimationController';
 
 interface CooldownState {
   [skillId: string]: number;
@@ -12,16 +14,31 @@ export class SkillInterpreter {
   private cooldowns: CooldownState = {};
   private scene: Phaser.Scene;
   private body: Phaser.Physics.Arcade.Body;
+  private sprite: Phaser.Physics.Arcade.Sprite;
   private onGroundFn: () => boolean;
+  private projectiles?: ProjectileManager;
+  private animCtrl?: AnimationController;
+  private baseScale = 1;
+  private scaleTween?: Phaser.Tweens.Tween;
 
   constructor(
     scene: Phaser.Scene,
-    body: Phaser.Physics.Arcade.Body,
+    sprite: Phaser.Physics.Arcade.Sprite,
     onGroundFn: () => boolean
   ) {
     this.scene = scene;
-    this.body = body;
+    this.sprite = sprite;
+    this.body = sprite.body as Phaser.Physics.Arcade.Body;
     this.onGroundFn = onGroundFn;
+    this.baseScale = sprite.scaleX;
+  }
+
+  setProjectileManager(pm: ProjectileManager): void {
+    this.projectiles = pm;
+  }
+
+  setAnimationController(ctrl: AnimationController | undefined): void {
+    this.animCtrl = ctrl;
   }
 
   loadSkills(skills: SkillSchema[]): void {
@@ -77,8 +94,15 @@ export class SkillInterpreter {
     for (const action of skill.actions) {
       switch (action.type) {
         case 'jump':
-          if (this.onGroundFn()) {
+          if (!skill.conditions?.some((c) => c.type === 'onGround') || this.onGroundFn()) {
             this.body.setVelocityY(-(action.force ?? 400));
+          }
+          break;
+        case 'impulse':
+          if (action.axis === 'x') {
+            this.body.setVelocityX(action.speed ?? action.force ?? 200);
+          } else {
+            this.body.setVelocityY(-(action.force ?? 300));
           }
           break;
         case 'move':
@@ -99,6 +123,51 @@ export class SkillInterpreter {
         case 'gravity':
           this.body.setGravityY(900 * (action.multiplier ?? 1));
           break;
+        case 'scale': {
+          const mult = action.multiplier ?? 1.5;
+          const dur = action.duration ?? 400;
+          this.scaleTween?.stop();
+          this.scene.tweens.add({
+            targets: this.sprite,
+            scaleX: this.baseScale * mult,
+            scaleY: this.baseScale * mult,
+            duration: dur / 2,
+            yoyo: true,
+            onComplete: () => {
+              this.sprite.setScale(this.baseScale);
+            },
+          });
+          break;
+        }
+        case 'rotate': {
+          const spin = action.spinSpeed ?? 360;
+          const dur = action.duration ?? 500;
+          this.scene.tweens.add({
+            targets: this.sprite,
+            angle: this.sprite.angle + (action.degrees ?? spin),
+            duration: dur,
+            onComplete: () => {
+              this.sprite.setAngle(0);
+            },
+          });
+          break;
+        }
+        case 'shoot': {
+          const cd = action.cooldown ?? 300;
+          if ((this.cooldowns[skill.id] ?? 0) > 0) break;
+          const dir = this.sprite.flipX ? -1 : 1;
+          this.projectiles?.fire(
+            this.sprite.x + dir * 20,
+            this.sprite.y,
+            dir,
+            action.projectileAssetId,
+            action.projectileSpeed ?? 420,
+            action.projectileLife ?? 2000
+          );
+          this.animCtrl?.triggerOneShot('shoot');
+          this.cooldowns[skill.id] = cd;
+          break;
+        }
       }
     }
   }

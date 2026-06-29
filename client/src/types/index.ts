@@ -2,7 +2,32 @@ export type AssetCategory = 'player' | 'platform' | 'enemy';
 export type EnemyBehavior = 'patrol' | 'chase' | 'stationary' | 'hopper';
 export type SkillTriggerType = 'keydown' | 'keyup' | 'hold';
 export type SkillConditionType = 'onGround' | 'inAir' | 'cooldownReady';
-export type SkillActionType = 'jump' | 'move' | 'dash' | 'gravity';
+export type SkillActionType =
+  | 'jump'
+  | 'move'
+  | 'dash'
+  | 'gravity'
+  | 'impulse'
+  | 'shoot'
+  | 'scale'
+  | 'rotate';
+
+export type AssetAnimClip = 'idle' | 'walk' | 'jump' | 'fall' | 'shoot' | 'hurt';
+
+export const ASSET_ANIM_CLIPS: AssetAnimClip[] = [
+  'idle',
+  'walk',
+  'jump',
+  'fall',
+  'shoot',
+  'hurt',
+];
+
+export interface AssetClipDef {
+  frames: number[][];
+  fps?: number;
+  loop?: boolean;
+}
 
 export interface PlatformDef {
   id: string;
@@ -45,6 +70,11 @@ export interface MusicSchema {
   notes: MusicNote[];
 }
 
+export interface MusicTrackExport {
+  name: string;
+  data: MusicSchema;
+}
+
 export interface LevelSchema {
   version: number;
   name: string;
@@ -58,6 +88,7 @@ export interface LevelSchema {
   skills: string[];
   musicSeed?: number;
   music?: MusicSchema;
+  musicTrackId?: string;
 }
 
 export interface SkillTrigger {
@@ -73,6 +104,12 @@ export interface SkillAction {
   distance?: number;
   cooldown?: number;
   multiplier?: number;
+  duration?: number;
+  degrees?: number;
+  spinSpeed?: number;
+  projectileAssetId?: string;
+  projectileSpeed?: number;
+  projectileLife?: number;
 }
 
 export interface SkillCondition {
@@ -95,8 +132,11 @@ export interface AssetSchema {
   pixels: number[];
   paletteSlots: number[];
   name?: string;
+  /** @deprecated use animations.idle */
   frames?: number[][];
+  /** @deprecated use animations.idle.fps */
   fps?: number;
+  animations?: Partial<Record<AssetAnimClip, AssetClipDef>>;
 }
 
 export interface User {
@@ -115,4 +155,9 @@ export interface SelectedEnemyConfig {
 
 export interface EditorTool {
   type: 'platform' | 'enemy' | 'spawn' | 'portal' | 'select' | 'delete';
+}
+
+export interface EditorSelection {
+  type: 'enemy';
+  id: string;
 }

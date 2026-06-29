@@ -6,6 +6,7 @@ import { DEFAULT_ENEMY_SELECTION } from '../game/entities/enemyRegistry';
 import { GameCanvas } from '../game/GameCanvas';
 import { PlatformPalette } from '../editor/PlatformPalette';
 import { EnemyPalette } from '../editor/EnemyPalette';
+import { EnemyInspector } from '../editor/EnemyInspector';
 import { PropertyPanel } from '../editor/PropertyPanel';
 import { SkillBuilder } from '../editor/SkillBuilder';
 import { generateProceduralLevel, validateLevel } from '../generator/LevelGenerator';
@@ -23,6 +24,7 @@ export function LevelEditor() {
   const [assets, setAssets] = useState<AssetSchema[]>([]);
   const [editorTool, setEditorTool] = useState('platform');
   const [selectedEnemy, setSelectedEnemy] = useState<SelectedEnemyConfig>(DEFAULT_ENEMY_SELECTION);
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [mode, setMode] = useState<'edit' | 'play'>('edit');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -126,7 +128,7 @@ export function LevelEditor() {
   const openMusicEditor = () => {
     const key = levelId ?? 'draft';
     sessionStorage.setItem(`music-level-${key}`, JSON.stringify(level));
-    navigate(`/music?level=${key}`);
+    navigate(`/music/level?level=${key}`);
   };
 
   return (
@@ -180,6 +182,19 @@ export function LevelEditor() {
             selected={selectedEnemy}
             onChange={setSelectedEnemy}
           />
+          <EnemyInspector
+            enemies={level.enemies}
+            selectedId={selectedEntityId}
+            assets={assets}
+            onSelect={setSelectedEntityId}
+            onChange={(enemy) => {
+              setLevel({
+                ...level,
+                enemies: level.enemies.map((e) => (e.id === enemy.id ? enemy : e)),
+              });
+            }}
+            onClear={() => setSelectedEntityId(null)}
+          />
           <PropertyPanel
             level={level}
             onChange={setLevel}
@@ -188,10 +203,12 @@ export function LevelEditor() {
             onEditMusic={openMusicEditor}
           />
           <SkillBuilder
+            compact
             skills={skills}
             selectedSkillIds={level.skills}
             onSkillsChange={(ids) => setLevel({ ...level, skills: ids })}
             onRefresh={loadData}
+            onManage={() => navigate('/skills')}
           />
         </aside>
 
@@ -203,7 +220,12 @@ export function LevelEditor() {
             mode={mode}
             editorTool={editorTool}
             selectedEnemy={selectedEnemy}
+            selectedEntityId={selectedEntityId}
             onLevelChange={handleLevelChange}
+            onEditorSelect={(type, id) => {
+              if (type === 'enemy' && id) setSelectedEntityId(id);
+              else if (!type) setSelectedEntityId(null);
+            }}
             onDeath={() => setMode('edit')}
             onWin={() => setCompleted(true)}
           />

@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { api } from '../api/client';
-import type { AssetSchema, AssetCategory } from '../types';
+import type { AssetSchema, AssetCategory, AssetAnimClip, AssetClipDef } from '../types';
 import { PixelCanvas, createEmptyAsset, validateAssetPixels } from '../editor/PixelCanvas';
 import { normalizeAssetPixels } from '../data/snesPalette';
 import { ALLOWED_SIZES } from '../data/retroLimits';
+import { migrateAssetAnimations } from '../game/utils/assetAnimations';
 
 export function AssetEditor() {
   const navigate = useNavigate();
@@ -13,8 +14,9 @@ export function AssetEditor() {
   const [size, setSize] = useState<number>(() => createEmptyAsset('player').width);
   const [name, setName] = useState('Mi Asset');
   const [pixels, setPixels] = useState<number[]>(() => createEmptyAsset('player').pixels);
-  const [frames, setFrames] = useState<number[][]>(() => createEmptyAsset('player').frames);
-  const [fps, setFps] = useState(8);
+  const [animations, setAnimations] = useState<Partial<Record<AssetAnimClip, AssetClipDef>>>(
+    () => createEmptyAsset('player').animations
+  );
   const [paletteSlots, setPaletteSlots] = useState<number[]>(
     () => createEmptyAsset('player').paletteSlots
   );
@@ -31,8 +33,7 @@ export function AssetEditor() {
     const empty = createEmptyAsset(cat);
     setSize(empty.width);
     setPixels(empty.pixels);
-    setFrames(empty.frames);
-    setFps(empty.fps);
+    setAnimations(empty.animations);
     setPaletteSlots(empty.paletteSlots);
     setEditingId(null);
   };
@@ -41,37 +42,48 @@ export function AssetEditor() {
     setSize(s);
     const empty = createEmptyAsset(category, s);
     setPixels(empty.pixels);
-    setFrames(empty.frames);
+    setAnimations(empty.animations);
     setPaletteSlots(empty.paletteSlots);
   };
 
-  const validateAllFrames = (): string | null => {
-    for (let i = 0; i < frames.length; i++) {
-      const normalized = normalizeAssetPixels(frames[i]!, size, size);
-      const err = validateAssetPixels(normalized, paletteSlots, size, size);
-      if (err) return `Frame ${i + 1}: ${err}`;
+  const validateAllClips = (): string | null => {
+    const anims = migrateAssetAnimations({ pixels, paletteSlots, animations } as AssetSchema);
+    for (const [clip, def] of Object.entries(anims)) {
+      for (let i = 0; i < (def?.frames.length ?? 0); i++) {
+        const normalized = normalizeAssetPixels(def!.frames[i]!, size, size);
+        const err = validateAssetPixels(normalized, paletteSlots, size, size);
+        if (err) return `${clip} frame ${i + 1}: ${err}`;
+      }
     }
     return null;
   };
 
   const handleSave = async () => {
-    const err = validateAllFrames();
+    const err = validateAllClips();
     if (err) {
       setMessage(err);
       return;
     }
 
-    const normalizedFrames = frames.map((f) => normalizeAssetPixels(f, size, size));
+    const normalizedAnims: Partial<Record<AssetAnimClip, AssetClipDef>> = {};
+    for (const [clip, def] of Object.entries(animations)) {
+      if (!def?.frames?.length) continue;
+      normalizedAnims[clip as AssetAnimClip] = {
+        ...def,
+        frames: def.frames.map((f) => normalizeAssetPixels(f, size, size)),
+      };
+    }
+
+    const idle = normalizedAnims.idle?.frames?.[0] ?? pixels;
     const asset: AssetSchema = {
       id: editingId ?? uuidv4(),
       category,
       width: size as 8 | 16 | 32,
       height: size as 8 | 16 | 32,
-      pixels: normalizedFrames[0]!,
+      pixels: idle,
       paletteSlots,
       name,
-      frames: normalizedFrames.length > 1 ? normalizedFrames : undefined,
-      fps: normalizedFrames.length > 1 ? fps : undefined,
+      animations: Object.keys(normalizedAnims).length ? normalizedAnims : undefined,
     };
 
     try {
@@ -95,10 +107,7 @@ export function AssetEditor() {
     setCategory(a.data.category);
     setSize(a.data.width);
     setPixels([...a.data.pixels]);
-    setFrames(
-      a.data.frames?.map((f) => [...f]) ?? [[...a.data.pixels]]
-    );
-    setFps(a.data.fps ?? 8);
+    setAnimations(JSON.parse(JSON.stringify(migrateAssetAnimations(a.data))));
     setPaletteSlots([...a.data.paletteSlots]);
   };
 
@@ -109,6 +118,8 @@ export function AssetEditor() {
       handleCategoryChange(category);
     }
   };
+
+  const clipCount = Object.keys(animations).length;
 
   return (
     <div className="asset-page">
@@ -162,7 +173,7 @@ export function AssetEditor() {
             {assets.map((a) => (
               <div key={a.id} className="asset-list-item">
                 <button className="retro-btn small" onClick={() => loadAsset(a)}>
-                  {a.name} ({a.data.width}px{a.data.frames ? ` · ${a.data.frames.length}f` : ''})
+                  {a.name} ({a.data.width}px)
                 </button>
                 <button
                   className="retro-btn small danger"
@@ -182,16 +193,15 @@ export function AssetEditor() {
             width={size}
             height={size}
             initialPixels={pixels}
-            initialFrames={frames}
+            initialAnimations={animations}
             initialPaletteSlots={paletteSlots}
-            initialFps={fps}
-            onChange={({ pixels: p, frames: f, paletteSlots: ps, fps: fp }) => {
+            onChange={({ pixels: p, animations: an, paletteSlots: ps }) => {
               setPixels(p);
-              setFrames(f);
+              setAnimations(an);
               setPaletteSlots(ps);
-              setFps(fp);
             }}
           />
+          <p className="hint">Clips activos: {clipCount} · idle/walk/jump/fall/shoot/hurt</p>
         </div>
       </div>
     </div>

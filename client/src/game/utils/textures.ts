@@ -1,8 +1,18 @@
 import Phaser from 'phaser';
-import type { AssetSchema } from '../../types';
+import type { AssetSchema, AssetAnimClip } from '../../types';
+import { ASSET_ANIM_CLIPS } from '../../types';
 import { paletteColor } from '../../data/snesPalette';
+import {
+  migrateAssetAnimations,
+  clipAnimKey,
+  clipSheetKey,
+  getClipFrames,
+  getPrimaryClip,
+} from './assetAnimations';
 
 export function getAssetFrames(asset: AssetSchema): number[][] {
+  const idle = getClipFrames(asset, 'idle');
+  if (idle) return idle;
   if (asset.frames && asset.frames.length > 0) return asset.frames;
   return [asset.pixels];
 }
@@ -27,13 +37,24 @@ function drawFrameToCanvas(
   }
 }
 
-export function registerAsset(scene: Phaser.Scene, asset: AssetSchema): void {
-  const baseKey = `asset-${asset.id}`;
-  const frames = getAssetFrames(asset);
+function registerClipSheet(
+  scene: Phaser.Scene,
+  asset: AssetSchema,
+  clip: AssetAnimClip,
+  frames: number[][]
+): void {
   const w = asset.width;
   const h = asset.height;
+  const sheetKey = clipSheetKey(asset.id, clip);
+  const animKey = clipAnimKey(asset.id, clip);
+  if (scene.textures.exists(sheetKey)) return;
+
+  const anims = migrateAssetAnimations(asset);
+  const def = anims[clip];
+  const loop = def?.loop ?? (clip === 'idle' || clip === 'walk');
 
   if (frames.length === 1) {
+    const baseKey = `asset-${asset.id}-${clip}`;
     if (scene.textures.exists(baseKey)) return;
     const canvas = document.createElement('canvas');
     canvas.width = w;
@@ -43,10 +64,6 @@ export function registerAsset(scene: Phaser.Scene, asset: AssetSchema): void {
     scene.textures.addCanvas(baseKey, canvas);
     return;
   }
-
-  const sheetKey = `${baseKey}-sheet`;
-  const animKey = `${baseKey}-anim`;
-  if (scene.textures.exists(sheetKey)) return;
 
   const canvas = document.createElement('canvas');
   canvas.width = w * frames.length;
@@ -68,32 +85,93 @@ export function registerAsset(scene: Phaser.Scene, asset: AssetSchema): void {
         start: 0,
         end: frames.length - 1,
       }),
+      frameRate: def?.fps ?? asset.fps ?? 8,
+      repeat: loop ? -1 : 0,
+    });
+  }
+}
+
+export function registerAssetClips(scene: Phaser.Scene, asset: AssetSchema): void {
+  const anims = migrateAssetAnimations(asset);
+  let registered = false;
+  for (const clip of ASSET_ANIM_CLIPS) {
+    const frames = anims[clip]?.frames;
+    if (!frames?.length) continue;
+    registerClipSheet(scene, asset, clip, frames);
+    registered = true;
+  }
+  if (!registered) {
+    registerLegacyAsset(scene, asset);
+  }
+}
+
+function registerLegacyAsset(scene: Phaser.Scene, asset: AssetSchema): void {
+  const baseKey = `asset-${asset.id}`;
+  const frames = asset.frames?.length ? asset.frames : [asset.pixels];
+  const w = asset.width;
+  const h = asset.height;
+
+  if (frames.length === 1) {
+    if (scene.textures.exists(baseKey)) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+    drawFrameToCanvas(ctx, frames[0]!, w, h, asset.paletteSlots);
+    scene.textures.addCanvas(baseKey, canvas);
+    return;
+  }
+
+  registerClipSheet(scene, asset, 'idle', frames);
+  const animKey = `asset-${asset.id}-anim`;
+  const sheetKey = clipSheetKey(asset.id, 'idle');
+  if (!scene.anims.exists(animKey) && scene.textures.exists(sheetKey)) {
+    scene.anims.create({
+      key: animKey,
+      frames: scene.anims.generateFrameNumbers(sheetKey, {
+        start: 0,
+        end: frames.length - 1,
+      }),
       frameRate: asset.fps ?? 8,
       repeat: -1,
     });
   }
 }
 
-/** @deprecated use registerAsset */
+/** @deprecated use registerAssetClips */
+export function registerAsset(scene: Phaser.Scene, asset: AssetSchema): void {
+  registerAssetClips(scene, asset);
+}
+
 export function assetToTexture(
   scene: Phaser.Scene,
   asset: AssetSchema,
   textureKey: string
 ): void {
   void textureKey;
-  registerAsset(scene, asset);
+  registerAssetClips(scene, asset);
 }
 
-export function assetTextureKey(asset: AssetSchema): string {
-  const frames = getAssetFrames(asset);
-  if (frames.length > 1) return `asset-${asset.id}-sheet`;
+export function assetTextureKey(asset: AssetSchema, clip: AssetAnimClip = 'idle'): string {
+  const frames = getClipFrames(asset, clip) ?? getAssetFrames(asset);
+  if (frames.length > 1) return clipSheetKey(asset.id, clip);
+  const anims = migrateAssetAnimations(asset);
+  if (anims[clip]?.frames?.length === 1) return `asset-${asset.id}-${clip}`;
+  if (frames.length === 1 && getPrimaryClip(asset) === clip) {
+    return `asset-${asset.id}-${clip}`;
+  }
   return `asset-${asset.id}`;
 }
 
-export function assetAnimKey(asset: AssetSchema): string | null {
-  const frames = getAssetFrames(asset);
-  if (frames.length <= 1) return null;
-  return `asset-${asset.id}-anim`;
+export function assetAnimKey(asset: AssetSchema, clip: AssetAnimClip = 'idle'): string | null {
+  const frames = getClipFrames(asset, clip);
+  if (!frames || frames.length <= 1) return null;
+  return clipAnimKey(asset.id, clip);
+}
+
+export function hasClipAnims(asset: AssetSchema): boolean {
+  const anims = migrateAssetAnimations(asset);
+  return ASSET_ANIM_CLIPS.some((c) => (anims[c]?.frames?.length ?? 0) > 0);
 }
 
 export function createDefaultSquareTexture(scene: Phaser.Scene): void {
@@ -133,6 +211,15 @@ export function createDefaultEnemyTexture(scene: Phaser.Scene): void {
   g.destroy();
 }
 
+export function createProjectileTexture(scene: Phaser.Scene): void {
+  if (scene.textures.exists('projectile-default')) return;
+  const g = scene.make.graphics({ x: 0, y: 0 });
+  g.fillStyle(0xffff00);
+  g.fillCircle(8, 8, 6);
+  g.generateTexture('projectile-default', 16, 16);
+  g.destroy();
+}
+
 export function createSpawnMarkerTexture(scene: Phaser.Scene): void {
   if (scene.textures.exists('spawn-marker')) return;
   const g = scene.make.graphics({ x: 0, y: 0 });
@@ -161,10 +248,11 @@ export function createPortalTexture(scene: Phaser.Scene): void {
 
 export function playSpriteAnim(
   sprite: Phaser.GameObjects.Sprite,
-  asset: AssetSchema | undefined
+  asset: AssetSchema | undefined,
+  clip: AssetAnimClip = 'idle'
 ): void {
   if (!asset) return;
-  const animKey = assetAnimKey(asset);
+  const animKey = assetAnimKey(asset, clip) ?? (clip === 'idle' ? `asset-${asset.id}-anim` : null);
   if (animKey && sprite.scene.anims.exists(animKey)) {
     sprite.play(animKey);
   }

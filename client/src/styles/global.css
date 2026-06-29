@@ -699,3 +699,95 @@ label {
 .music-page {
   height: 100vh;
 }
+
+.music-hub-page,
+.skills-hub-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.music-hub-layout,
+.skills-hub-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.music-hub-sidebar,
+.skills-hub-list {
+  width: 220px;
+  padding: 8px;
+  border-right: 2px solid var(--border);
+  overflow-y: auto;
+}
+
+.music-hub-editor {
+  flex: 1;
+  overflow: auto;
+}
+
+.skills-hub-editor {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.enemy-inspector {
+  border-top: 2px solid var(--border);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.enemy-inspector-form label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 8px;
+}
+
+.enemy-list-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.clip-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.clip-tabs .retro-btn.has-data {
+  border-color: var(--accent);
+}
+
+.action-block {
+  border: 2px solid var(--border);
+  padding: 8px;
+  margin-bottom: 8px;
+}
+
+.action-header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.condition-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 8px;
+}
+
+.track-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

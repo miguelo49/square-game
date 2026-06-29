@@ -37,7 +37,11 @@ export const KEY_OPTIONS = [
 
 export const ACTION_OPTIONS = [
   { label: 'Saltar', value: 'jump' },
+  { label: 'Impulso (aire/empuje)', value: 'impulse' },
   { label: 'Mover', value: 'move' },
   { label: 'Dash', value: 'dash' },
   { label: 'Gravedad', value: 'gravity' },
+  { label: 'Escalar tamaño', value: 'scale' },
+  { label: 'Rotar', value: 'rotate' },
+  { label: 'Disparar', value: 'shoot' },
 ];

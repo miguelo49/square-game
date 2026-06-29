@@ -20,6 +20,12 @@ export function MainMenu() {
         <button className="retro-btn menu-btn" onClick={() => navigate('/assets')}>
           Crear Assets
         </button>
+        <button className="retro-btn menu-btn" onClick={() => navigate('/music')}>
+          Compositor de Música
+        </button>
+        <button className="retro-btn menu-btn" onClick={() => navigate('/skills')}>
+          Habilidades
+        </button>
       </div>
 
       <button

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { AssetCategory } from '../types';
+import type { AssetCategory, AssetAnimClip, AssetClipDef } from '../types';
+import { ASSET_ANIM_CLIPS } from '../types';
+import { clipLoopsByDefault } from '../game/utils/assetAnimations';
 import {
   SNES_PALETTE,
   DEFAULT_PALETTE_SLOTS,
@@ -20,11 +22,13 @@ interface PixelCanvasProps {
   initialFrames?: number[][];
   initialPaletteSlots?: number[];
   initialFps?: number;
+  initialAnimations?: Partial<Record<AssetAnimClip, AssetClipDef>>;
   onChange?: (data: {
     pixels: number[];
     frames: number[][];
     paletteSlots: number[];
     fps: number;
+    animations: Partial<Record<AssetAnimClip, AssetClipDef>>;
   }) => void;
 }
 
@@ -36,8 +40,26 @@ export function PixelCanvas({
   initialFrames,
   initialPaletteSlots,
   initialFps = 8,
+  initialAnimations,
   onChange,
 }: PixelCanvasProps) {
+  const emptyFrame = () => new Array(width * height).fill(0);
+  const buildInitialAnimations = (): Partial<Record<AssetAnimClip, AssetClipDef>> => {
+    if (initialAnimations && Object.keys(initialAnimations).length > 0) {
+      return JSON.parse(JSON.stringify(initialAnimations));
+    }
+    const idleFrames = initialFrames?.length
+      ? initialFrames.map((f) => [...f])
+      : [initialPixels ? [...initialPixels] : emptyFrame()];
+    return {
+      idle: { frames: idleFrames, fps: initialFps, loop: true },
+    };
+  };
+
+  const [activeClip, setActiveClip] = useState<AssetAnimClip>('idle');
+  const [animations, setAnimations] = useState<Partial<Record<AssetAnimClip, AssetClipDef>>>(
+    buildInitialAnimations
+  );
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const undoStack = useRef<number[][]>([]);
@@ -48,11 +70,12 @@ export function PixelCanvas({
     () => initialPaletteSlots ?? [...DEFAULT_PALETTE_SLOTS]
   );
   const [frames, setFrames] = useState<number[][]>(() => {
-    if (initialFrames?.length) return initialFrames.map((f) => [...f]);
-    return [initialPixels ? [...initialPixels] : new Array(width * height).fill(0)];
+    const anims = buildInitialAnimations();
+    return anims.idle?.frames?.map((f) => [...f]) ?? [emptyFrame()];
   });
   const [frameIndex, setFrameIndex] = useState(0);
-  const [fps, setFps] = useState(initialFps);
+  const [fps, setFps] = useState(() => animations.idle?.fps ?? initialFps);
+  const [clipLoop, setClipLoop] = useState(() => animations.idle?.loop ?? true);
   const [onionSkin, setOnionSkin] = useState(true);
   const [isDrawing, setIsDrawing] = useState(false);
   const pixelSize = Math.min(16, Math.floor(512 / Math.max(width, height)));
@@ -60,27 +83,62 @@ export function PixelCanvas({
   const pixels = frames[frameIndex] ?? new Array(width * height).fill(0);
 
   const emitChange = useCallback(
-    (nextFrames: number[][], nextPalette: number[], nextFps: number) => {
+    (
+      nextFrames: number[][],
+      nextPalette: number[],
+      nextFps: number,
+      nextLoop: boolean,
+      clip: AssetAnimClip,
+      allAnims: Partial<Record<AssetAnimClip, AssetClipDef>>
+    ) => {
+      const updated = { ...allAnims };
+      if (nextFrames.some((f) => f.some((p) => p !== 0))) {
+        updated[clip] = { frames: nextFrames, fps: nextFps, loop: nextLoop };
+      } else {
+        delete updated[clip];
+      }
+      const idle = updated.idle?.frames?.[0] ?? nextFrames[0] ?? [];
       onChange?.({
-        pixels: nextFrames[0] ?? [],
-        frames: nextFrames,
+        pixels: idle,
+        frames: updated.idle?.frames ?? nextFrames,
         paletteSlots: nextPalette,
         fps: nextFps,
+        animations: updated,
       });
     },
     [onChange]
   );
+
+  const syncClipToState = useCallback(
+    (clip: AssetAnimClip, anims: Partial<Record<AssetAnimClip, AssetClipDef>>) => {
+      const def = anims[clip];
+      const nextFrames = def?.frames?.map((f) => [...f]) ?? [emptyFrame()];
+      setFrames(nextFrames);
+      setFrameIndex(0);
+      setFps(def?.fps ?? 8);
+      setClipLoop(def?.loop ?? clipLoopsByDefault(clip));
+    },
+    [width, height]
+  );
+
+  const switchClip = (clip: AssetAnimClip) => {
+    const merged = { ...animations, [activeClip]: { frames, fps, loop: clipLoop } };
+    if (!frames.some((f) => f.some((p) => p !== 0))) delete merged[activeClip];
+    setAnimations(merged);
+    setActiveClip(clip);
+    syncClipToState(clip, merged);
+  };
 
   const setFramePixels = useCallback(
     (idx: number, nextPixels: number[]) => {
       setFrames((prev) => {
         const copy = prev.map((f) => [...f]);
         copy[idx] = nextPixels;
-        emitChange(copy, paletteSlots, fps);
+        emitChange(copy, paletteSlots, fps, clipLoop, activeClip, animations);
         return copy;
       });
     },
-    [emitChange, paletteSlots, fps]
+    [emitChange, paletteSlots, fps, clipLoop, activeClip, animations]
   );
 
   const pushUndo = useCallback(() => {
@@ -104,11 +162,11 @@ export function PixelCanvas({
     const dup = [...(frames[frameIndex] ?? pixels)];
     setFrames((prev) => {
       const copy = [...prev, dup];
-      emitChange(copy, paletteSlots, fps);
+      emitChange(copy, paletteSlots, fps, clipLoop, activeClip, animations);
       return copy;
     });
     setFrameIndex(frames.length);
-  }, [frames, frameIndex, pixels, emitChange, paletteSlots, fps]);
+  }, [frames, frameIndex, pixels, emitChange, paletteSlots, fps, clipLoop, activeClip, animations]);
 
   const duplicateFrame = useCallback(() => {
     if (frames.length >= MAX_FRAMES) return;
@@ -119,11 +177,11 @@ export function PixelCanvas({
     if (frames.length <= 1) return;
     setFrames((prev) => {
       const copy = prev.filter((_, i) => i !== frameIndex);
-      emitChange(copy, paletteSlots, fps);
+      emitChange(copy, paletteSlots, fps, clipLoop, activeClip, animations);
       return copy;
     });
     setFrameIndex((i) => Math.max(0, i - 1));
-  }, [frameIndex, frames.length, emitChange, paletteSlots, fps]);
+  }, [frameIndex, frames.length, emitChange, paletteSlots, fps, clipLoop, activeClip, animations]);
 
   const assignMasterToSlot = useCallback(
     (masterIdx: number) => {
@@ -131,12 +189,19 @@ export function PixelCanvas({
       const next = [...paletteSlots];
       next[selectedSlot] = masterIdx;
       setPaletteSlots(next);
-      emitChange(frames, next, fps);
+      emitChange(frames, next, fps, clipLoop, activeClip, animations);
     },
-    [selectedSlot, paletteSlots, frames, fps, emitChange]
+    [selectedSlot, paletteSlots, frames, fps, clipLoop, activeClip, animations, emitChange]
   );
 
   const usedMasterColors = new Set<number>();
+  for (const clip of Object.values(animations)) {
+    for (const f of clip?.frames ?? []) {
+      for (const p of f) {
+        if (p !== 0) usedMasterColors.add(paletteSlots[p] ?? p);
+      }
+    }
+  }
   for (const f of frames) {
     for (const p of f) {
       if (p !== 0) usedMasterColors.add(paletteSlots[p] ?? p);
@@ -255,6 +320,18 @@ export function PixelCanvas({
         <span>Frames: {frames.length}/{MAX_FRAMES}</span>
       </div>
 
+      <div className="clip-tabs">
+        {ASSET_ANIM_CLIPS.map((clip) => (
+          <button
+            key={clip}
+            className={`retro-btn small ${activeClip === clip ? 'active' : ''} ${animations[clip] ? 'has-data' : ''}`}
+            onClick={() => switchClip(clip)}
+          >
+            {clip}
+          </button>
+        ))}
+      </div>
+
       <div className="frame-tabs">
         {frames.map((_, i) => (
           <button
@@ -283,6 +360,13 @@ export function PixelCanvas({
           <input type="checkbox" checked={onionSkin} onChange={(e) => setOnionSkin(e.target.checked)} />
           Onion
         </label>
+        <label className="onion-toggle">
+          <input type="checkbox" checked={clipLoop} onChange={(e) => {
+            setClipLoop(e.target.checked);
+            emitChange(frames, paletteSlots, fps, e.target.checked, activeClip, animations);
+          }} />
+          Loop
+        </label>
         <label>
           FPS
           <input
@@ -294,7 +378,7 @@ export function PixelCanvas({
             onChange={(e) => {
               const v = Number(e.target.value);
               setFps(v);
-              emitChange(frames, paletteSlots, v);
+              emitChange(frames, paletteSlots, v, clipLoop, activeClip, animations);
             }}
           />
         </label>
@@ -351,7 +435,15 @@ export function PixelCanvas({
 export function createEmptyAsset(
   category: AssetCategory,
   size?: number
-): { pixels: number[]; frames: number[][]; paletteSlots: number[]; width: number; height: number; fps: number } {
+): {
+  pixels: number[];
+  frames: number[][];
+  paletteSlots: number[];
+  width: number;
+  height: number;
+  fps: number;
+  animations: Partial<Record<import('../types').AssetAnimClip, import('../types').AssetClipDef>>;
+} {
   const s = size ?? DEFAULT_SIZES[category];
   const empty = new Array(s * s).fill(0);
   return {
@@ -361,6 +453,9 @@ export function createEmptyAsset(
     frames: [empty],
     paletteSlots: [...DEFAULT_PALETTE_SLOTS],
     fps: 8,
+    animations: {
+      idle: { frames: [empty], fps: 8, loop: true },
+    },
   };
 }
 
