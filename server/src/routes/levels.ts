@@ -411,6 +411,7 @@ export function seedDemoLevel(): void {
     portal: { x: 2880, y: 808, w: 32, h: 48 },
     skills: [
       'skill_jump',
+      'skill_double_jump',
       'skill_move_left',
       'skill_move_right',
       'skill_move_left_a',
@@ -425,6 +426,7 @@ export function seedDemoLevel(): void {
 
 const DEMO_SKILLS = [
   'skill_jump',
+  'skill_double_jump',
   'skill_move_left',
   'skill_move_right',
   'skill_move_left_a',

@@ -103,11 +103,12 @@ export const SKILL_PRESETS: SkillPreset[] = [
     id: 'preset_double_jump',
     label: 'Doble salto',
     description: 'SPACE en aire — segundo impulso',
+    systemSkillId: 'skill_double_jump',
     skill: {
       name: 'Doble salto',
       trigger: { type: 'keydown', key: 'SPACE' },
       actions: [{ type: 'impulse', axis: 'y', force: 320, animClip: 'jump' }],
-      conditions: [{ type: 'inAir' }],
+      conditions: [{ type: 'airJumpAvailable' }],
       animClip: 'jump',
     },
   },

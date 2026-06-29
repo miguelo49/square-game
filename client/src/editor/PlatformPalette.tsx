@@ -1,6 +1,8 @@
 interface PlatformPaletteProps {
   activeTool: string;
   onToolChange: (tool: string) => void;
+  defaultPlatformPreset: string;
+  onDefaultPresetChange: (presetId: string) => void;
 }
 
 const TOOLS = [
@@ -12,7 +14,19 @@ const TOOLS = [
   { id: 'delete', label: 'Borrar', icon: '✕' },
 ];
 
-export function PlatformPalette({ activeTool, onToolChange }: PlatformPaletteProps) {
+const PLACE_PRESETS = [
+  { id: 'static', label: 'Estática' },
+  { id: 'elevator', label: 'Ascensor' },
+  { id: 'crumbling', label: 'Desmorona' },
+  { id: 'conveyor', label: 'Cinta' },
+];
+
+export function PlatformPalette({
+  activeTool,
+  onToolChange,
+  defaultPlatformPreset,
+  onDefaultPresetChange,
+}: PlatformPaletteProps) {
   return (
     <div className="platform-palette">
       <h3>Herramientas</h3>
@@ -26,9 +40,24 @@ export function PlatformPalette({ activeTool, onToolChange }: PlatformPalettePro
           {tool.label}
         </button>
       ))}
+
+      <label className="default-preset-label">
+        Comportamiento al colocar ▬
+        <select
+          className="retro-input"
+          value={defaultPlatformPreset}
+          onChange={(e) => onDefaultPresetChange(e.target.value)}
+        >
+          {PLACE_PRESETS.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
       <p className="hint">
-        Click para colocar. Arrastra objetos. Click derecho borra enemigo/plataforma.
-        Flechas mueven cámara. Rueda = zoom.
+        Click coloca · Arrastra mueve · Click der. borra · Flechas cámara
       </p>
     </div>
   );

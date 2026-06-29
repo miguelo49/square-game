@@ -119,14 +119,18 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const id = uuidv4();
+      const payload =
+        data && typeof data === 'object'
+          ? { ...(data as Record<string, unknown>), id }
+          : data;
       db.prepare('INSERT INTO assets (id, user_id, name, data) VALUES (?, ?, ?, ?)').run(
         id,
         userId,
         name,
-        JSON.stringify(data)
+        JSON.stringify(payload)
       );
 
-      return { id, name, data };
+      return { id, name, data: payload };
     }
   );
 
@@ -142,16 +146,24 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
 
       const { name, data } = request.body ?? {};
       if (name && data) {
+        const payload =
+          typeof data === 'object'
+            ? { ...(data as Record<string, unknown>), id: request.params.id }
+            : data;
         db.prepare('UPDATE assets SET name = ?, data = ? WHERE id = ?').run(
           name,
-          JSON.stringify(data),
+          JSON.stringify(payload),
           request.params.id
         );
       } else if (name) {
         db.prepare('UPDATE assets SET name = ? WHERE id = ?').run(name, request.params.id);
       } else if (data) {
+        const payload =
+          typeof data === 'object'
+            ? { ...(data as Record<string, unknown>), id: request.params.id }
+            : data;
         db.prepare('UPDATE assets SET data = ? WHERE id = ?').run(
-          JSON.stringify(data),
+          JSON.stringify(payload),
           request.params.id
         );
       }
@@ -245,6 +257,18 @@ export function seedDefaultSkills(): void {
         trigger: { type: 'keydown', key: 'SHIFT' },
         actions: [{ type: 'dash', distance: 160, cooldown: 800 }],
         conditions: [{ type: 'onGround' }],
+      },
+    },
+    {
+      id: 'skill_double_jump',
+      name: 'Doble salto',
+      data: {
+        id: 'skill_double_jump',
+        name: 'Doble salto',
+        trigger: { type: 'keydown', key: 'SPACE' },
+        actions: [{ type: 'impulse', axis: 'y', force: 320, animClip: 'jump' }],
+        conditions: [{ type: 'airJumpAvailable' }],
+        animClip: 'jump',
       },
     },
   ];

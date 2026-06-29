@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../api/client';
-import type { LevelSchema, SelectedEnemyConfig } from '../types';
+import type { AssetSchema, LevelSchema, SelectedEnemyConfig } from '../types';
 import { DEFAULT_ENEMY_SELECTION } from '../game/entities/enemyRegistry';
 import { GameCanvas } from '../game/GameCanvas';
 import { PlatformPalette } from '../editor/PlatformPalette';
@@ -10,10 +10,17 @@ import { EnemyInspector } from '../editor/EnemyInspector';
 import { PlatformInspector } from '../editor/PlatformInspector';
 import { PropertyPanel } from '../editor/PropertyPanel';
 import { SkillBuilder } from '../editor/SkillBuilder';
+import { EditorSidebar } from '../editor/EditorSidebar';
 import { generateProceduralLevel, validateLevel } from '../generator/LevelGenerator';
-import { downloadSqlevel, importSqlevel } from '../storage/compression';
+import {
+  downloadSqlevel,
+  importSqlevel,
+  embedLevelAssets,
+  mergeEmbeddedAssets,
+} from '../storage/compression';
 import { migrateLevel } from '../game/utils/placement';
 import { useGameContent } from '../hooks/useGameContent';
+import { mergeById } from '../utils/mergeContent';
 
 export function LevelEditor() {
   const navigate = useNavigate();
@@ -23,14 +30,21 @@ export function LevelEditor() {
   const [levelId, setLevelId] = useState<string | null>(null);
   const [isPublic, setIsPublic] = useState(false);
   const [editorTool, setEditorTool] = useState('platform');
+  const [defaultPlatformPreset, setDefaultPlatformPreset] = useState('static');
   const [selectedEnemy, setSelectedEnemy] = useState<SelectedEnemyConfig>(DEFAULT_ENEMY_SELECTION);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [selectedEntityType, setSelectedEntityType] = useState<'enemy' | 'platform' | ''>('');
+  const [extraAssets, setExtraAssets] = useState<AssetSchema[]>([]);
   const [mode, setMode] = useState<'edit' | 'play'>('edit');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [completed, setCompleted] = useState(false);
   const { assets, skills, musicTracks, reload: reloadContent } = useGameContent();
+
+  const allAssets = useMemo(
+    () => mergeById(assets, extraAssets),
+    [assets, extraAssets]
+  );
 
   useEffect(() => {
     const key = levelId ?? 'draft';
@@ -46,6 +60,14 @@ export function LevelEditor() {
     [skills, level.skills]
   );
 
+  const selectedPlatform = useMemo(
+    () =>
+      selectedEntityType === 'platform' && selectedEntityId
+        ? level.platforms.find((p) => p.id === selectedEntityId) ?? null
+        : null,
+    [level.platforms, selectedEntityId, selectedEntityType]
+  );
+
   const handleLevelChange = useCallback((updated: LevelSchema) => {
     setLevel(updated);
   }, []);
@@ -59,14 +81,14 @@ export function LevelEditor() {
     setSaving(true);
     setMessage('');
     try {
-      const data = { ...level, name: levelName };
+      const data = embedLevelAssets({ ...level, name: levelName }, allAssets);
       if (levelId) {
         await api.levels.update(levelId, levelName, data);
         setMessage('Nivel guardado!');
       } else {
         const res = await api.levels.create(levelName, data);
         setLevelId(res.id);
-        setMessage('Nivel creado!');
+        setMessage('Nivel guardado!');
       }
     } catch (e) {
       setMessage((e as Error).message);
@@ -99,22 +121,37 @@ export function LevelEditor() {
   };
 
   const handleExport = () => {
-    downloadSqlevel({ ...level, name: levelName }, levelName.replace(/\s+/g, '_'));
-    setMessage('Exportado como .sqlevel');
+    downloadSqlevel(
+      embedLevelAssets({ ...level, name: levelName }, allAssets),
+      levelName.replace(/\s+/g, '_')
+    );
+    setMessage('Exportado como .sqlevel (incluye assets embebidos)');
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const imported = await importSqlevel(file);
-      setLevel(migrateLevel(imported));
+      const imported = migrateLevel(await importSqlevel(file));
+      const { level: cleanLevel, mergedAssets, missingIds } = mergeEmbeddedAssets(
+        imported,
+        allAssets
+      );
+      setLevel(cleanLevel);
       setLevelName(imported.name);
       setLevelId(null);
-      setMessage('Nivel importado!');
+      if (mergedAssets.length > extraAssets.length) {
+        setExtraAssets((prev) => mergeById(prev, imported.embeddedAssets ?? []));
+      }
+      setMessage(
+        missingIds.length
+          ? `Importado. Faltan assets: ${missingIds.join(', ')}`
+          : 'Nivel importado!'
+      );
     } catch {
       setMessage('Error al importar');
     }
+    e.target.value = '';
   };
 
   const openMusicEditor = () => {
@@ -167,79 +204,101 @@ export function LevelEditor() {
       )}
 
       <div className="editor-layout">
-        <aside className="editor-sidebar">
-          <PlatformPalette activeTool={editorTool} onToolChange={setEditorTool} />
-          <EnemyPalette
-            assets={assets}
-            selected={selectedEnemy}
-            onChange={setSelectedEnemy}
-          />
-          <PlatformInspector
-            platforms={level.platforms}
-            selectedId={selectedEntityType === 'platform' ? selectedEntityId : null}
-            assets={assets}
-            onSelect={(id) => {
-              setSelectedEntityType('platform');
-              setSelectedEntityId(id);
-            }}
-            onChange={(platform) => {
-              setLevel({
-                ...level,
-                platforms: level.platforms.map((p) => (p.id === platform.id ? platform : p)),
-              });
-            }}
-            onClear={() => {
-              setSelectedEntityId(null);
-              setSelectedEntityType('');
-            }}
-          />
-          <EnemyInspector
-            enemies={level.enemies}
-            selectedId={selectedEntityType === 'enemy' ? selectedEntityId : null}
-            assets={assets}
-            onSelect={(id) => {
-              setSelectedEntityType('enemy');
-              setSelectedEntityId(id);
-            }}
-            onChange={(enemy) => {
-              setLevel({
-                ...level,
-                enemies: level.enemies.map((e) => (e.id === enemy.id ? enemy : e)),
-              });
-            }}
-            onClear={() => {
-              setSelectedEntityId(null);
-              setSelectedEntityType('');
-            }}
-          />
-          <PropertyPanel
-            level={level}
-            onChange={setLevel}
-            levelName={levelName}
-            onNameChange={setLevelName}
-            onEditMusic={openMusicEditor}
-            musicTracks={musicTracks}
-          />
-          <SkillBuilder
-            compact
-            skills={skills}
-            selectedSkillIds={level.skills}
-            onSkillsChange={(ids) => setLevel({ ...level, skills: ids })}
-            onRefresh={reloadContent}
-            onManage={() => navigate('/skills')}
-          />
-        </aside>
+        <EditorSidebar
+          selectedEntityType={selectedEntityType}
+          toolsPanel={
+            <>
+              <PlatformPalette
+                activeTool={editorTool}
+                onToolChange={setEditorTool}
+                defaultPlatformPreset={defaultPlatformPreset}
+                onDefaultPresetChange={setDefaultPlatformPreset}
+              />
+              <EnemyPalette
+                assets={allAssets}
+                selected={selectedEnemy}
+                onChange={setSelectedEnemy}
+              />
+            </>
+          }
+          inspectorPanel={
+            selectedEntityType === 'platform' ? (
+              <PlatformInspector
+                platform={selectedPlatform}
+                assets={allAssets}
+                onChange={(platform) => {
+                  setLevel({
+                    ...level,
+                    platforms: level.platforms.map((p) =>
+                      p.id === platform.id ? platform : p
+                    ),
+                  });
+                }}
+                onClear={() => {
+                  setSelectedEntityId(null);
+                  setSelectedEntityType('');
+                }}
+              />
+            ) : selectedEntityType === 'enemy' ? (
+              <EnemyInspector
+                enemies={level.enemies}
+                selectedId={selectedEntityId}
+                assets={allAssets}
+                onSelect={(id) => {
+                  setSelectedEntityType('enemy');
+                  setSelectedEntityId(id);
+                }}
+                onChange={(enemy) => {
+                  setLevel({
+                    ...level,
+                    enemies: level.enemies.map((e) => (e.id === enemy.id ? enemy : e)),
+                  });
+                }}
+                onClear={() => {
+                  setSelectedEntityId(null);
+                  setSelectedEntityType('');
+                }}
+              />
+            ) : (
+              <div className="inspector-empty">
+                <p className="hint">Selecciona una plataforma o enemigo con ◎</p>
+              </div>
+            )
+          }
+          levelPanel={
+            <>
+              <PropertyPanel
+                level={level}
+                onChange={setLevel}
+                levelName={levelName}
+                onNameChange={setLevelName}
+                onEditMusic={openMusicEditor}
+                musicTracks={musicTracks}
+              />
+              <SkillBuilder
+                compact
+                skills={skills}
+                selectedSkillIds={level.skills}
+                onSkillsChange={(ids) => setLevel({ ...level, skills: ids })}
+                onRefresh={reloadContent}
+                onManage={() => navigate('/skills')}
+              />
+            </>
+          }
+        />
 
         <div className="game-panel editor-game">
           <GameCanvas
             level={level}
             skills={activeSkills}
             assets={assets}
+            extraAssets={extraAssets}
             musicTracks={musicTracks}
             mode={mode}
             editorTool={editorTool}
             selectedEnemy={selectedEnemy}
             selectedEntityId={selectedEntityId}
+            defaultPlatformPreset={defaultPlatformPreset}
             onLevelChange={handleLevelChange}
             onEditorSelect={(type, id) => {
               if (type === 'enemy' && id) {

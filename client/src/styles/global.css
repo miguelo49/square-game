@@ -376,6 +376,81 @@ label {
   margin-bottom: 4px;
 }
 
+.editor-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.editor-tab {
+  flex: 1;
+  min-width: 0;
+  font-size: 7px;
+  padding: 6px 4px;
+}
+
+.editor-tab.active {
+  background: var(--accent);
+  color: var(--bg-dark);
+}
+
+.tab-badge {
+  margin-left: 4px;
+}
+
+.editor-tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inspector-empty {
+  padding: 8px 0;
+}
+
+.guide-steps {
+  line-height: 1.6;
+}
+
+.platform-preset-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.platform-inspector-compact h4 {
+  font-size: 8px;
+  color: var(--accent);
+  margin: 8px 0 4px;
+}
+
+.advanced-rules {
+  margin-top: 8px;
+  font-size: 8px;
+}
+
+.advanced-rules summary {
+  cursor: pointer;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.platform-asset-preview {
+  image-rendering: pixelated;
+  border: 2px solid var(--border);
+  margin-top: 6px;
+}
+
+.default-preset-label {
+  margin-top: 8px;
+  font-size: 8px;
+}
+
+.platform-tile-hint {
+  margin-bottom: 8px;
+}
+
 .platform-palette {
   display: flex;
   flex-direction: column;

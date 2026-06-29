@@ -1,7 +1,7 @@
 export type AssetCategory = 'player' | 'platform' | 'enemy';
 export type EnemyBehavior = 'patrol' | 'chase' | 'stationary' | 'hopper';
 export type SkillTriggerType = 'keydown' | 'keyup' | 'hold';
-export type SkillConditionType = 'onGround' | 'inAir' | 'cooldownReady';
+export type SkillConditionType = 'onGround' | 'inAir' | 'cooldownReady' | 'airJumpAvailable';
 export type SkillActionType =
   | 'jump'
   | 'move'
@@ -160,6 +160,8 @@ export interface LevelSchema {
   musicSeed?: number;
   music?: MusicSchema;
   musicTrackId?: string;
+  /** Assets embebidos al exportar nivel (platform/enemy refs) */
+  embeddedAssets?: AssetSchema[];
 }
 
 export interface SkillTrigger {

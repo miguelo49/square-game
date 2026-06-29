@@ -22,6 +22,7 @@ export class SkillInterpreter {
   private animCtrl?: AnimationController;
   private baseScale = 1;
   private scaleTween?: Phaser.Tweens.Tween;
+  private airJumpsUsed = 0;
 
   constructor(
     scene: Phaser.Scene,
@@ -57,6 +58,10 @@ export class SkillInterpreter {
   }
 
   update(_time: number, delta: number): void {
+    if (this.onGroundFn()) {
+      this.airJumpsUsed = 0;
+    }
+
     for (const skillId of Object.keys(this.cooldowns)) {
       this.cooldowns[skillId] = Math.max(0, this.cooldowns[skillId] - delta);
     }
@@ -85,6 +90,9 @@ export class SkillInterpreter {
     for (const cond of skill.conditions) {
       if (cond.type === 'onGround' && !this.onGroundFn()) return false;
       if (cond.type === 'inAir' && this.onGroundFn()) return false;
+      if (cond.type === 'airJumpAvailable') {
+        if (this.onGroundFn() || this.airJumpsUsed >= 1) return false;
+      }
       if (cond.type === 'cooldownReady' && (this.cooldowns[skill.id] ?? 0) > 0) {
         return false;
       }
@@ -99,6 +107,18 @@ export class SkillInterpreter {
     }
   }
 
+  private usesAirJump(skill: SkillSchema): boolean {
+    return (
+      skill.conditions?.some((c) => c.type === 'inAir' || c.type === 'airJumpAvailable') ?? false
+    );
+  }
+
+  private consumeAirJump(skill: SkillSchema): void {
+    if (this.usesAirJump(skill)) {
+      this.airJumpsUsed++;
+    }
+  }
+
   private executeActions(skill: SkillSchema): void {
     for (const action of skill.actions) {
       switch (action.type) {
@@ -106,6 +126,7 @@ export class SkillInterpreter {
           if (!skill.conditions?.some((c) => c.type === 'onGround') || this.onGroundFn()) {
             this.body.setVelocityY(-(action.force ?? 400));
           }
+          this.consumeAirJump(skill);
           this.triggerActionAnim(action, skill);
           break;
         case 'impulse':
@@ -114,6 +135,7 @@ export class SkillInterpreter {
           } else {
             this.body.setVelocityY(-(action.force ?? 300));
           }
+          this.consumeAirJump(skill);
           this.triggerActionAnim(action, skill);
           break;
         case 'move':

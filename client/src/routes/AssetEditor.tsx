@@ -5,8 +5,9 @@ import { api } from '../api/client';
 import type { AssetSchema, AssetCategory, AssetAnimClip, AssetClipDef } from '../types';
 import { PixelCanvas, createEmptyAsset, validateAssetPixels } from '../editor/PixelCanvas';
 import { normalizeAssetPixels } from '../data/snesPalette';
-import { ALLOWED_SIZES } from '../data/retroLimits';
 import { migrateAssetAnimations } from '../game/utils/assetAnimations';
+import { downloadSqasset, importSqasset } from '../storage/compression';
+import { ALLOWED_SIZES } from '../data/retroLimits';
 
 export function AssetEditor() {
   const navigate = useNavigate();
@@ -122,6 +123,51 @@ export function AssetEditor() {
     }
   };
 
+  const handleExport = () => {
+    const err = validateAllClips();
+    if (err) {
+      setMessage(err);
+      return;
+    }
+    const idle = animations.idle?.frames?.[0] ?? pixels;
+    const asset: AssetSchema = {
+      id: editingId ?? uuidv4(),
+      category,
+      width: size as 8 | 16 | 32,
+      height: size as 8 | 16 | 32,
+      pixels: idle,
+      paletteSlots,
+      name,
+      animations: Object.keys(animations).length ? animations : undefined,
+    };
+    downloadSqasset(asset, name.replace(/\s+/g, '_'));
+    setMessage('Exportado como .sqasset');
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const imported = await importSqasset(file);
+      const data = imported.data;
+      if (!ALLOWED_SIZES[data.category as AssetCategory]?.includes(data.width as never)) {
+        setMessage('Tamaño de asset no válido para SNES');
+        return;
+      }
+      setName(imported.name);
+      setCategory(data.category);
+      setSize(data.width);
+      setPixels([...data.pixels]);
+      setAnimations(JSON.parse(JSON.stringify(migrateAssetAnimations(data))));
+      setPaletteSlots([...data.paletteSlots]);
+      setEditingId(null);
+      setMessage('Asset importado — guarda para añadir a tu biblioteca');
+    } catch {
+      setMessage('Error al importar .sqasset');
+    }
+    e.target.value = '';
+  };
+
   const clipCount = Object.keys(animations).length;
 
   return (
@@ -144,6 +190,13 @@ export function AssetEditor() {
               {isPublic ? 'Dejar de compartir' : 'Compartir'}
             </button>
           )}
+          <button className="retro-btn" onClick={handleExport}>
+            Exportar
+          </button>
+          <label className="retro-btn file-label">
+            Importar
+            <input type="file" accept=".sqasset" onChange={handleImport} hidden />
+          </label>
           <button className="retro-btn primary" onClick={handleSave}>
             Guardar Asset
           </button>
@@ -218,7 +271,11 @@ export function AssetEditor() {
               setPaletteSlots(ps);
             }}
           />
-          <p className="hint">Clips activos: {clipCount} · idle/walk/jump/fall/shoot/hurt</p>
+          <p className="hint">
+            {category === 'platform'
+              ? 'Plataforma: un tile base; el juego genera bordes al unir bloques.'
+              : `Clips activos: ${clipCount} · idle/walk/jump/fall/shoot/hurt`}
+          </p>
         </div>
       </div>
     </div>

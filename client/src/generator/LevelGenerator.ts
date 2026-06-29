@@ -39,6 +39,7 @@ export function generateDemoLevel(): LevelSchema {
     portal: { x: 2880, y: entityCenterYOnSurface(832, PORTAL_H), w: 32, h: PORTAL_H },
     skills: [
       'skill_jump',
+      'skill_double_jump',
       'skill_move_left',
       'skill_move_right',
       'skill_move_left_a',
@@ -119,6 +120,7 @@ export function generateProceduralLevel(seed?: number): LevelSchema {
     enemies,
     skills: [
       'skill_jump',
+      'skill_double_jump',
       'skill_move_left',
       'skill_move_right',
       'skill_move_left_a',

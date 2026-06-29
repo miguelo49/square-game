@@ -312,16 +312,26 @@ export function PixelCanvas({
   };
 
   const allowedSizes = ALLOWED_SIZES[category];
+  const visibleClips =
+    category === 'platform' ? (['idle'] as AssetAnimClip[]) : ASSET_ANIM_CLIPS;
 
   return (
     <div ref={containerRef} className="pixel-editor" tabIndex={0} onPointerDown={() => containerRef.current?.focus()}>
       <div className="pixel-editor-info">
         <span>{width}×{height} — {usedMasterColors.size}/{MAX_COLORS_PER_SPRITE - 1} colores</span>
-        <span>Frames: {frames.length}/{MAX_FRAMES}</span>
+        {category !== 'platform' && (
+          <span>Frames: {frames.length}/{MAX_FRAMES}</span>
+        )}
       </div>
 
+      {category === 'platform' && (
+        <p className="hint platform-tile-hint">
+          Tile base para autotile (16×16 recomendado). Al unir plataformas en el nivel, los bordes se adaptan solos.
+        </p>
+      )}
+
       <div className="clip-tabs">
-        {ASSET_ANIM_CLIPS.map((clip) => (
+        {visibleClips.map((clip) => (
           <button
             key={clip}
             className={`retro-btn small ${activeClip === clip ? 'active' : ''} ${animations[clip] ? 'has-data' : ''}`}
@@ -333,7 +343,7 @@ export function PixelCanvas({
       </div>
 
       <div className="frame-tabs">
-        {frames.map((_, i) => (
+        {category !== 'platform' && frames.map((_, i) => (
           <button
             key={i}
             className={`retro-btn small ${frameIndex === i ? 'active' : ''}`}
@@ -342,7 +352,7 @@ export function PixelCanvas({
             {i + 1}
           </button>
         ))}
-        {frames.length < MAX_FRAMES && (
+        {category !== 'platform' && frames.length < MAX_FRAMES && (
           <button className="retro-btn small" onClick={addFrame}>+</button>
         )}
       </div>

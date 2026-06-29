@@ -24,6 +24,7 @@ import { initSpriteAnimation, AnimationController } from '../systems/AnimationCo
 import { ProjectileManager } from '../systems/ProjectileManager';
 import { migrateLevel, snapToPlatformSurface, PORTAL_H } from '../utils/placement';
 import { snapPlatformAdjacent } from '../utils/platformSnap';
+import { applyPlatformPreset } from '../../data/platformPresets';
 import { stripRuntimePlatforms } from '../systems/PlatformScriptRunner';
 import { GAME_CAPTURE_KEYS } from '../utils/phaserKeys';
 import { GRID_SNAP } from '../../data/retroLimits';
@@ -71,6 +72,7 @@ export class GameScene extends Phaser.Scene {
   private won = false;
   private runStartedAt = 0;
   private deathCount = 0;
+  private defaultPlatformPreset = 'static';
 
   constructor() {
     super('GameScene');
@@ -85,6 +87,7 @@ export class GameScene extends Phaser.Scene {
     editorTool?: string;
     selectedEnemy?: SelectedEnemyConfig;
     selectedEntityId?: string | null;
+    defaultPlatformPreset?: string;
   }): void {
     this.level = migrateLevel(data.level);
     this.skills = data.skills ?? [];
@@ -94,6 +97,7 @@ export class GameScene extends Phaser.Scene {
     this.editorTool = data.editorTool ?? 'select';
     this.selectedEnemy = data.selectedEnemy ?? DEFAULT_ENEMY_SELECTION;
     this.selectedEntityId = data.selectedEntityId ?? null;
+    this.defaultPlatformPreset = data.defaultPlatformPreset ?? 'static';
     this.won = false;
     this.runStartedAt = Date.now();
     this.deathCount = 0;
@@ -325,6 +329,19 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private refreshPlatformTiles(): void {
+    if (!this.platformTileRenderer || this.platformEntities.length === 0) return;
+    const containers = new Map(
+      this.platformEntities.map((e) => [e.id, e.visual])
+    );
+    this.platformTileRenderer.setAssets(this.assets);
+    this.platformTileRenderer.refreshAll(
+      this.level.platforms,
+      containers,
+      this.mode === 'edit'
+    );
+  }
+
   private buildLevel(): void {
     this.destroyPlatformEntities();
     this.platforms.clear(true, true);
@@ -346,6 +363,8 @@ export class GameScene extends Phaser.Scene {
     for (const p of this.level.platforms) {
       this.platformEntities.push(this.createPlatformEntity(p));
     }
+
+    this.refreshPlatformTiles();
 
     if (this.mode === 'play') {
       this.setupPlatformBehavior();
@@ -509,10 +528,19 @@ export class GameScene extends Phaser.Scene {
 
       if (this.editorTool === 'platform') {
         const id = `p-${Date.now()}`;
-        const newPlat: PlatformDef = { id, x, y, w: 128, h: 32, solid: true };
-        const snapped = snapPlatformAdjacent(newPlat, this.level.platforms);
+        let newPlat: PlatformDef = {
+          id,
+          x: 0,
+          y: 0,
+          w: 128,
+          h: 32,
+          solid: true,
+          presetId: this.defaultPlatformPreset,
+        };
+        const snapped = snapPlatformAdjacent({ ...newPlat, x, y }, this.level.platforms);
         newPlat.x = snapped.x;
         newPlat.y = snapped.y;
+        newPlat = applyPlatformPreset(newPlat, this.defaultPlatformPreset);
         this.level.platforms.push(newPlat);
         this.rebuildAndEmit();
       } else if (this.editorTool === 'enemy') {

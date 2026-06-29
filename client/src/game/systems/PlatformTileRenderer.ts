@@ -44,13 +44,22 @@ export class PlatformTileRenderer {
 
   refreshAll(
     platforms: PlatformDef[],
-    containers: Map<string, Phaser.GameObjects.Container>
+    containers: Map<string, Phaser.GameObjects.Container>,
+    editMode = false
   ): void {
     const occupancy = buildOccupancyGrid(platforms);
     for (const def of platforms) {
       const container = containers.get(def.id);
       if (!container) continue;
-      container.removeAll(true);
+
+      const preserved = editMode
+        ? container.list.filter((c) => c.getData?.('type') === 'platform')
+        : [];
+      for (const child of container.list) {
+        if (!preserved.includes(child)) child.destroy();
+      }
+      container.removeAll(false);
+
       const group = platformVisualGroup(def);
       ensurePlatformTileTextures(this.scene, group, this.assets);
       const cells = decomposePlatformTiles(def, occupancy);
@@ -60,6 +69,7 @@ export class PlatformTileRenderer {
         img.setDisplaySize(PLATFORM_TILE_SIZE, PLATFORM_TILE_SIZE);
         container.add(img);
       }
+      for (const p of preserved) container.add(p);
     }
   }
 }

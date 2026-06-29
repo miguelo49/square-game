@@ -5,15 +5,18 @@ import { GameScene } from './scenes/GameScene';
 import { MusicPlayer } from '../audio/MusicPlayer';
 import type { LevelSchema, SkillSchema, AssetSchema, GameMode, SelectedEnemyConfig, RunResult } from '../types';
 import type { MusicTrackRef } from '../hooks/useGameContent';
+import { mergeById } from '../utils/mergeContent';
 
 interface GameCanvasProps {
   level: LevelSchema;
   skills?: SkillSchema[];
   assets?: AssetSchema[];
+  extraAssets?: AssetSchema[];
   mode?: GameMode;
   editorTool?: string;
   selectedEnemy?: SelectedEnemyConfig;
   selectedEntityId?: string | null;
+  defaultPlatformPreset?: string;
   onLevelChange?: (level: LevelSchema) => void;
   onEditorSelect?: (type: string, id: string) => void;
   onDeath?: () => void;
@@ -25,10 +28,12 @@ export function GameCanvas({
   level,
   skills = [],
   assets = [],
+  extraAssets = [],
   mode = 'play',
   editorTool = 'select',
   selectedEnemy,
   selectedEntityId,
+  defaultPlatformPreset = 'static',
   onLevelChange,
   onEditorSelect,
   onDeath,
@@ -39,14 +44,24 @@ export function GameCanvas({
   const gameRef = useRef<Phaser.Game | null>(null);
   const musicRef = useRef<MusicPlayer | null>(null);
   const bootedRef = useRef(false);
+  const mergedAssets = useMemo(
+    () => mergeById(assets, extraAssets),
+    [assets, extraAssets]
+  );
+  const assetsKey = useMemo(
+    () => mergedAssets.map((a) => a.id).join(','),
+    [mergedAssets]
+  );
+
   const propsRef = useRef({
     level,
     skills,
-    assets,
+    assets: mergedAssets,
     mode,
     editorTool,
     selectedEnemy,
     selectedEntityId,
+    defaultPlatformPreset,
     onDeath,
     onWin,
     onEditorSelect,
@@ -55,11 +70,12 @@ export function GameCanvas({
   propsRef.current = {
     level,
     skills,
-    assets,
+    assets: mergedAssets,
     mode,
     editorTool,
     selectedEnemy,
     selectedEntityId,
+    defaultPlatformPreset,
     onDeath,
     onWin,
     onEditorSelect,
@@ -70,10 +86,7 @@ export function GameCanvas({
     () => skills.map((s) => s.id).join(','),
     [skills]
   );
-  const assetsKey = useMemo(
-    () => assets.map((a) => a.id).join(','),
-    [assets]
-  );
+  const presetKey = defaultPlatformPreset;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -96,6 +109,7 @@ export function GameCanvas({
         editorTool: p.editorTool,
         selectedEnemy: p.selectedEnemy,
         selectedEntityId: p.selectedEntityId,
+        defaultPlatformPreset: p.defaultPlatformPreset,
         callbacks: {
           onDeath: () => propsRef.current.onDeath?.(),
           onWin: (result: RunResult) => propsRef.current.onWin?.(result),
@@ -143,6 +157,7 @@ export function GameCanvas({
       editorTool: p.editorTool,
       selectedEnemy: p.selectedEnemy,
       selectedEntityId: p.selectedEntityId,
+      defaultPlatformPreset: p.defaultPlatformPreset,
       callbacks: {
         onDeath: () => propsRef.current.onDeath?.(),
         onWin: (result: RunResult) => propsRef.current.onWin?.(result),
@@ -156,7 +171,7 @@ export function GameCanvas({
     } else {
       game.scene.start('GameScene', payload);
     }
-  }, [levelKey, skillsKey, assetsKey, mode, editorTool]);
+  }, [levelKey, skillsKey, assetsKey, mode, editorTool, presetKey]);
 
   useEffect(() => {
     const game = gameRef.current;
