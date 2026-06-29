@@ -133,7 +133,7 @@ export class GameScene extends Phaser.Scene {
 
     this.platformTileRenderer = new PlatformTileRenderer(this, this.assets);
 
-    this.physics.world.setBounds(0, 0, this.level.width, this.level.height);
+    this.physics.world.setBounds(0, 0, this.level.width, this.level.height + 2000);
     this.cameras.main.setBackgroundColor(this.level.backgroundColor);
 
     this.cameraCtrl = new CameraController(this);
@@ -591,10 +591,11 @@ export class GameScene extends Phaser.Scene {
       let y = go.y;
 
       if (type === 'platform') {
+        const entity = this.platformEntities.find((pe) => pe.id === id);
         const p = this.level.platforms.find((pl) => pl.id === id);
-        if (p) {
-          p.x = x - p.w / 2;
-          p.y = y - p.h / 2;
+        if (entity && p) {
+          p.x = entity.baseX;
+          p.y = entity.baseY;
           const snapped = snapPlatformAdjacent(p, this.level.platforms);
           p.x = snapped.x;
           p.y = snapped.y;
@@ -680,6 +681,11 @@ export class GameScene extends Phaser.Scene {
       this.platformBehaviorRunner?.update(delta, this.player, this.cameras.main);
       for (const enemy of this.enemies) {
         enemy.update(this.player, delta, _time);
+      }
+
+      const DEATH_MARGIN = 32;
+      if (this.player.y + 16 > this.level.height + DEATH_MARGIN) {
+        this.handleDeath();
       }
     }
 
