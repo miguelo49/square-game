@@ -116,8 +116,54 @@ export interface EnemyDef {
   y: number;
   behavior: EnemyBehavior;
   patrolRange?: number;
+  speed?: number;
+  direction?: 1 | -1;
   assetId?: string;
   typeId?: string;
+}
+
+export interface CoinDef {
+  id: string;
+  x: number;
+  y: number;
+}
+
+export interface CheckpointDef {
+  id: string;
+  x: number;
+  y: number;
+}
+
+export interface DecorationDef {
+  id: string;
+  x: number;
+  y: number;
+  assetId?: string;
+  w?: number;
+  h?: number;
+}
+
+export interface HazardDef {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  type: 'spike' | 'lava';
+}
+
+export type WinConditionType = 'portal' | 'coins' | 'enemies' | 'survive';
+
+export interface WinCondition {
+  type: WinConditionType;
+  target?: number;
+}
+
+export interface LevelTheme {
+  id: string;
+  backgroundColor: string;
+  gridColor?: string;
+  parallaxLayers?: string[];
 }
 
 export interface PortalDef {
@@ -160,6 +206,14 @@ export interface LevelSchema {
   musicSeed?: number;
   music?: MusicSchema;
   musicTrackId?: string;
+  playerAssetId?: string;
+  defaultPlatformAssetId?: string;
+  themeId?: string;
+  coins?: CoinDef[];
+  checkpoints?: CheckpointDef[];
+  decorations?: DecorationDef[];
+  hazards?: HazardDef[];
+  winCondition?: WinCondition;
   /** Assets embebidos al exportar nivel (platform/enemy refs) */
   embeddedAssets?: AssetSchema[];
 }

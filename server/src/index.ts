@@ -7,6 +7,7 @@ import { levelRoutes, seedDemoLevel, migrateDemoLevelSkills } from './routes/lev
 import { assetRoutes, seedDefaultSkills, migrateSkillKeyCodes } from './routes/assets.js';
 import { skillRoutes } from './routes/skills.js';
 import { musicRoutes } from './routes/music.js';
+import { userRoutes } from './routes/users.js';
 
 async function main() {
   seedDefaultSkills();
@@ -29,6 +30,7 @@ async function main() {
   await app.register(assetRoutes);
   await app.register(skillRoutes);
   await app.register(musicRoutes);
+  await app.register(userRoutes);
 
   app.get('/api/health', async () => ({ ok: true }));
 

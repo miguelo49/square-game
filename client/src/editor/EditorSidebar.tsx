@@ -1,62 +1,48 @@
-import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-
-export type EditorSidebarTab = 'tools' | 'inspector' | 'level';
 
 interface EditorSidebarProps {
   selectedEntityType: 'enemy' | 'platform' | '';
   toolsPanel: ReactNode;
   inspectorPanel: ReactNode;
   levelPanel: ReactNode;
+  shortcutsPanel?: ReactNode;
+  className?: string;
 }
-
-const TABS: {
-  id: EditorSidebarTab;
-  label: string;
-  icon: string;
-  title: string;
-}[] = [
-  { id: 'tools', label: 'Herramientas', icon: '◈', title: 'Herramientas de edición' },
-  { id: 'inspector', label: 'Inspector', icon: '▣', title: 'Inspector de entidad' },
-  { id: 'level', label: 'Nivel', icon: '☰', title: 'Propiedades del nivel' },
-];
 
 export function EditorSidebar({
   selectedEntityType,
   toolsPanel,
   inspectorPanel,
   levelPanel,
+  shortcutsPanel,
+  className = '',
 }: EditorSidebarProps) {
-  const [tab, setTab] = useState<EditorSidebarTab>('tools');
-
-  useEffect(() => {
-    if (selectedEntityType) setTab('inspector');
-  }, [selectedEntityType]);
-
   return (
-    <aside className="editor-sidebar">
-      <div className="editor-tabs">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            title={t.title}
-            className={`retro-btn small editor-tab ${tab === t.id ? 'active' : ''}`}
-            onClick={() => setTab(t.id)}
-          >
-            <span className="editor-tab-icon">{t.icon}</span>
-            <span className="editor-tab-label">{t.label}</span>
-            {t.id === 'inspector' && selectedEntityType && (
-              <span className="tab-badge">{selectedEntityType === 'platform' ? '▬' : '△'}</span>
-            )}
-          </button>
-        ))}
+    <aside className={`editor-sidebar editor-sidebar-split ${className}`.trim()}>
+      <div className="editor-sidebar-tools">
+        <h3 className="sidebar-section-title">Herramientas</h3>
+        {toolsPanel}
+        {shortcutsPanel}
       </div>
 
-      <div className="editor-tab-panel">
-        {tab === 'tools' && toolsPanel}
-        {tab === 'inspector' && inspectorPanel}
-        {tab === 'level' && levelPanel}
+      {selectedEntityType ? (
+        <div className="editor-sidebar-inspector">
+          <h3 className="sidebar-section-title">
+            Inspector {selectedEntityType === 'platform' ? '▬' : '△'}
+          </h3>
+          {inspectorPanel}
+        </div>
+      ) : (
+        <div className="editor-sidebar-inspector inspector-empty">
+          <p className="hint guide-steps">
+            1) Coloca con ▬ · 2) Selecciona con ◎ · 3) Ajusta comportamiento
+          </p>
+        </div>
+      )}
+
+      <div className="editor-sidebar-level">
+        <h3 className="sidebar-section-title">Nivel</h3>
+        {levelPanel}
       </div>
     </aside>
   );

@@ -37,6 +37,10 @@ export class EditorGrid {
     this.draw(width, height);
   }
 
+  setVisible(visible: boolean): void {
+    this.graphics.setVisible(visible);
+  }
+
   destroy(): void {
     this.graphics.destroy();
   }

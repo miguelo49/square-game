@@ -175,4 +175,36 @@ export async function musicRoutes(app: FastifyInstance): Promise<void> {
       return { ok: true };
     }
   );
+
+  app.post<{ Params: { id: string } }>(
+    '/api/music/:id/clone',
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      const row = db
+        .prepare(
+          `SELECT name, data FROM music_tracks WHERE id = ? AND (user_id = ? OR is_public = 1)`
+        )
+        .get(request.params.id, userId) as { name: string; data: string } | undefined;
+
+      if (!row) return reply.code(404).send({ error: 'Pista no encontrada' });
+
+      const count = db
+        .prepare('SELECT COUNT(*) as c FROM music_tracks WHERE user_id = ?')
+        .get(userId) as { c: number };
+      if (count.c >= MAX_TRACKS) {
+        return reply.code(400).send({ error: `Máximo ${MAX_TRACKS} pistas por usuario` });
+      }
+
+      const id = uuidv4();
+      const data = JSON.parse(row.data);
+      const cloneName = `${row.name} (copia)`;
+      db.prepare('INSERT INTO music_tracks (id, user_id, name, data) VALUES (?, ?, ?, ?)').run(
+        id,
+        userId,
+        cloneName,
+        JSON.stringify(data)
+      );
+      return { id, name: cloneName, data };
+    }
+  );
 }

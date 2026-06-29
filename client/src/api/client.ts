@@ -56,6 +56,12 @@ export const api = {
           name: string;
           data: import('../types').LevelSchema;
           authorNickname: string;
+          playCount?: number;
+          clearCount?: number;
+          clearRate?: number;
+          likeCount?: number;
+          userLiked?: boolean;
+          tags?: string[];
         }>
       >('/levels/public'),
     listFavorites: () =>
@@ -75,21 +81,44 @@ export const api = {
         data: import('../types').LevelSchema;
         isPublic?: boolean;
         isFavorite?: boolean;
+        authorCleared?: boolean;
+        authorNickname?: string;
+        playCount?: number;
+        clearCount?: number;
+        clearRate?: number;
+        likeCount?: number;
+        userLiked?: boolean;
+        tags?: string[];
       }>(`/levels/${id}`),
     create: (name: string, data: import('../types').LevelSchema) =>
       request<{ id: string }>('/levels', {
         method: 'POST',
         body: JSON.stringify({ name, data }),
       }),
-    update: (id: string, name: string, data: import('../types').LevelSchema) =>
+    update: (id: string, name: string, data: import('../types').LevelSchema, tags?: string[]) =>
       request<{ ok: boolean }>(`/levels/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ name, data }),
+        body: JSON.stringify(tags !== undefined ? { name, data, tags } : { name, data }),
       }),
     delete: (id: string) =>
       request<{ ok: boolean }>(`/levels/${id}`, { method: 'DELETE' }),
     share: (id: string) =>
       request<{ isPublic: boolean }>(`/levels/${id}/share`, { method: 'POST' }),
+    clearTest: (id: string) =>
+      request<{ cleared: boolean }>(`/levels/${id}/clear-test`, { method: 'POST' }),
+    recordPlay: (id: string) =>
+      request<{ ok: boolean }>(`/levels/${id}/play`, { method: 'POST' }),
+    like: (id: string) =>
+      request<{ liked: boolean }>(`/levels/${id}/like`, { method: 'POST' }),
+    comments: (id: string) =>
+      request<
+        Array<{ id: string; body: string; createdAt: number; nickname: string }>
+      >(`/levels/${id}/comments`),
+    addComment: (id: string, body: string) =>
+      request<{ id: string; body: string }>(`/levels/${id}/comments`, {
+        method: 'POST',
+        body: JSON.stringify({ body }),
+      }),
     favorite: (id: string) =>
       request<{ isFavorite: boolean }>(`/levels/${id}/favorite`, { method: 'POST' }),
     leaderboard: (id: string) =>
@@ -126,9 +155,12 @@ export const api = {
         }>
       >('/assets/public'),
     get: (id: string) =>
-      request<{ id: string; name: string; data: import('../types').AssetSchema }>(
-        `/assets/${id}`
-      ),
+      request<{
+        id: string;
+        name: string;
+        data: import('../types').AssetSchema;
+        isPublic?: boolean;
+      }>(`/assets/${id}`),
     create: (name: string, data: import('../types').AssetSchema) =>
       request<{ id: string }>('/assets', {
         method: 'POST',
@@ -143,6 +175,11 @@ export const api = {
       request<{ ok: boolean }>(`/assets/${id}`, { method: 'DELETE' }),
     share: (id: string) =>
       request<{ isPublic: boolean }>(`/assets/${id}/share`, { method: 'POST' }),
+    clone: (id: string) =>
+      request<{ id: string; name: string; data: import('../types').AssetSchema }>(
+        `/assets/${id}/clone`,
+        { method: 'POST' }
+      ),
   },
   skills: {
     list: () =>
@@ -177,6 +214,11 @@ export const api = {
       request<{ ok: boolean }>(`/skills/${id}`, { method: 'DELETE' }),
     share: (id: string) =>
       request<{ isPublic: boolean }>(`/skills/${id}/share`, { method: 'POST' }),
+    clone: (id: string) =>
+      request<{ id: string; name: string; data: import('../types').SkillSchema }>(
+        `/skills/${id}/clone`,
+        { method: 'POST' }
+      ),
   },
   music: {
     list: () =>
@@ -211,5 +253,27 @@ export const api = {
       request<{ ok: boolean }>(`/music/${id}`, { method: 'DELETE' }),
     share: (id: string) =>
       request<{ isPublic: boolean }>(`/music/${id}/share`, { method: 'POST' }),
+    clone: (id: string) =>
+      request<{ id: string; name: string; data: import('../types').MusicSchema }>(
+        `/music/${id}/clone`,
+        { method: 'POST' }
+      ),
+  },
+  users: {
+    getProfile: (nickname: string) =>
+      request<{
+        nickname: string;
+        createdAt: number;
+        levels: Array<{
+          id: string;
+          name: string;
+          data: import('../types').LevelSchema;
+          playCount: number;
+          clearCount: number;
+          likeCount: number;
+          clearRate: number;
+          tags: string[];
+        }>;
+      }>(`/users/${encodeURIComponent(nickname)}`),
   },
 };

@@ -10,7 +10,7 @@ const TOOLS = [
   { id: 'platform', label: 'Plataforma', icon: '▬' },
   { id: 'enemy', label: 'Enemigo △', icon: '△' },
   { id: 'spawn', label: 'Spawn', icon: '★' },
-  { id: 'portal', label: 'Portal', icon: '◎' },
+  { id: 'portal', label: 'Portal', icon: '◉' },
   { id: 'delete', label: 'Borrar', icon: '✕' },
 ];
 
@@ -19,6 +19,13 @@ const PLACE_PRESETS = [
   { id: 'elevator', label: 'Ascensor' },
   { id: 'crumbling', label: 'Desmorona' },
   { id: 'conveyor', label: 'Cinta' },
+];
+
+const EXTRA_TOOLS = [
+  { id: 'coin', label: 'Moneda ○', icon: '○' },
+  { id: 'checkpoint', label: 'Checkpoint', icon: '⚑' },
+  { id: 'decoration', label: 'Decoración', icon: '✦' },
+  { id: 'hazard', label: 'Trampa', icon: '▲' },
 ];
 
 export function PlatformPalette({
@@ -30,6 +37,17 @@ export function PlatformPalette({
   return (
     <div className="platform-palette">
       {TOOLS.map((tool) => (
+        <button
+          key={tool.id}
+          className={`retro-btn palette-btn ${activeTool === tool.id ? 'active' : ''}`}
+          onClick={() => onToolChange(tool.id)}
+        >
+          <span className="tool-icon">{tool.icon}</span>
+          {tool.label}
+        </button>
+      ))}
+
+      {EXTRA_TOOLS.map((tool) => (
         <button
           key={tool.id}
           className={`retro-btn palette-btn ${activeTool === tool.id ? 'active' : ''}`}

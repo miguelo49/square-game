@@ -28,11 +28,14 @@ import { applyPlatformPreset } from '../../data/platformPresets';
 import { stripRuntimePlatforms } from '../systems/PlatformScriptRunner';
 import { GAME_CAPTURE_KEYS } from '../utils/phaserKeys';
 import { GRID_SNAP } from '../../data/retroLimits';
+import { Sfx } from '../../audio/SfxPlayer';
 
 export interface GameSceneCallbacks {
   onDeath?: () => void;
   onWin?: (result: RunResult) => void;
   onEditorSelect?: (type: string, id: string) => void;
+  onCursorMove?: (x: number, y: number) => void;
+  onCameraChange?: (x: number, y: number, zoom: number) => void;
 }
 
 type DraggableObject = Phaser.GameObjects.Rectangle | Phaser.GameObjects.Image | TriangleEnemy;
@@ -73,6 +76,15 @@ export class GameScene extends Phaser.Scene {
   private runStartedAt = 0;
   private deathCount = 0;
   private defaultPlatformPreset = 'static';
+  private showGridVisible = true;
+  private coinsCollected = 0;
+  private enemiesDefeated = 0;
+  private lastCheckpoint: { x: number; y: number } | null = null;
+  private coinSprites: Phaser.GameObjects.Arc[] = [];
+  private checkpointMarkers: Phaser.GameObjects.Rectangle[] = [];
+  private hazardZones: Phaser.Physics.Arcade.StaticGroup | undefined;
+  private decorationSprites: Phaser.GameObjects.Image[] = [];
+  private resizeHandles: Phaser.GameObjects.Rectangle[] = [];
   private dragStartX = 0;
   private dragStartY = 0;
 
@@ -90,6 +102,7 @@ export class GameScene extends Phaser.Scene {
     selectedEnemy?: SelectedEnemyConfig;
     selectedEntityId?: string | null;
     defaultPlatformPreset?: string;
+    showGrid?: boolean;
   }): void {
     this.level = migrateLevel(data.level);
     this.skills = data.skills ?? [];
@@ -100,9 +113,13 @@ export class GameScene extends Phaser.Scene {
     this.selectedEnemy = data.selectedEnemy ?? DEFAULT_ENEMY_SELECTION;
     this.selectedEntityId = data.selectedEntityId ?? null;
     this.defaultPlatformPreset = data.defaultPlatformPreset ?? 'static';
+    this.showGridVisible = data.showGrid ?? true;
     this.won = false;
     this.runStartedAt = Date.now();
     this.deathCount = 0;
+    this.coinsCollected = 0;
+    this.enemiesDefeated = 0;
+    this.lastCheckpoint = null;
   }
 
   create(): void {
@@ -144,6 +161,7 @@ export class GameScene extends Phaser.Scene {
 
     if (this.mode === 'edit') {
       this.editorGrid = new EditorGrid(this, this.level.width, this.level.height);
+      this.editorGrid.setVisible(this.showGridVisible);
       this.editorGhost = new EditorGhost(this);
       this.deleteHighlight = this.add.rectangle(0, 0, 32, 32, 0xff0000, 0.35);
       this.deleteHighlight.setStrokeStyle(2, 0xff4444);
@@ -159,7 +177,10 @@ export class GameScene extends Phaser.Scene {
     this.platforms = this.physics.add.staticGroup();
     this.buildLevel();
 
-    const playerAsset = this.assets.find((a) => a.category === 'player');
+    const playerAsset =
+      (this.level.playerAssetId
+        ? this.assets.find((a) => a.id === this.level.playerAssetId)
+        : undefined) ?? this.assets.find((a) => a.category === 'player');
     const playerTex = playerAsset ? assetTextureKey(playerAsset) : 'square-default';
     this.player = this.physics.add.sprite(
       this.level.spawn.x,
@@ -216,6 +237,15 @@ export class GameScene extends Phaser.Scene {
     this.events.on('set-selected-entity', (id: string | null) => {
       this.selectedEntityId = id;
       this.updateSelectionHighlight();
+      if (this.mode === 'edit') {
+        this.resizeHandles.forEach((h) => h.destroy());
+        this.resizeHandles = [];
+        if (id) this.buildResizeHandles();
+      }
+    }, this);
+    this.events.on('set-grid-visible', (visible: boolean) => {
+      this.showGridVisible = visible;
+      this.editorGrid?.setVisible(visible);
     }, this);
   }
 
@@ -348,6 +378,16 @@ export class GameScene extends Phaser.Scene {
       this.portalZone.destroy(true);
       this.portalZone = undefined;
     }
+    this.coinSprites.forEach((s) => s.destroy());
+    this.coinSprites = [];
+    this.checkpointMarkers.forEach((s) => s.destroy());
+    this.checkpointMarkers = [];
+    this.decorationSprites.forEach((s) => s.destroy());
+    this.decorationSprites = [];
+    this.hazardZones?.destroy(true);
+    this.hazardZones = undefined;
+    this.resizeHandles.forEach((h) => h.destroy());
+    this.resizeHandles = [];
 
     for (const p of this.level.platforms) {
       this.platformEntities.push(this.createPlatformEntity(p));
@@ -413,6 +453,104 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.editorGrid?.resize(this.level.width, this.level.height);
+    this.buildExtras();
+    if (this.mode === 'edit' && this.selectedEntityId) {
+      this.buildResizeHandles();
+    }
+  }
+
+  private buildExtras(): void {
+    for (const c of this.level.coins ?? []) {
+      const coin = this.add.circle(c.x, c.y, 8, 0xffdd00, 1);
+      coin.setStrokeStyle(2, 0xaa8800);
+      coin.setDepth(50);
+      if (this.mode === 'edit') {
+        coin.setInteractive({ draggable: true });
+        coin.setData('type', 'coin');
+        coin.setData('id', c.id);
+      } else {
+        this.physics.add.existing(coin);
+        (coin.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
+        (coin.body as Phaser.Physics.Arcade.Body).setImmovable(true);
+      }
+      this.coinSprites.push(coin);
+    }
+
+    for (const cp of this.level.checkpoints ?? []) {
+      const flag = this.add.rectangle(cp.x, cp.y, 24, 32, 0x44ff88, 0.7);
+      flag.setStrokeStyle(2, 0x22aa44);
+      flag.setDepth(50);
+      if (this.mode === 'edit') {
+        flag.setInteractive({ draggable: true });
+        flag.setData('type', 'checkpoint');
+        flag.setData('id', cp.id);
+      } else {
+        this.physics.add.existing(flag, true);
+      }
+      this.checkpointMarkers.push(flag);
+    }
+
+    for (const d of this.level.decorations ?? []) {
+      const img = this.add.rectangle(d.x, d.y, d.w ?? 16, d.h ?? 16, 0x8888ff, 0.5);
+      img.setDepth(10);
+      if (this.mode === 'edit') {
+        img.setInteractive({ draggable: true });
+        img.setData('type', 'decoration');
+        img.setData('id', d.id);
+      }
+      this.decorationSprites.push(img as unknown as Phaser.GameObjects.Image);
+    }
+
+    if ((this.level.hazards?.length ?? 0) > 0) {
+      this.hazardZones = this.physics.add.staticGroup();
+      for (const h of this.level.hazards ?? []) {
+        const zone = this.add.rectangle(
+          h.x + h.w / 2,
+          h.y + h.h / 2,
+          h.w,
+          h.h,
+          h.type === 'lava' ? 0xff4400 : 0xff0000,
+          0.6
+        );
+        if (this.mode === 'edit') {
+          zone.setInteractive({ draggable: true });
+          zone.setData('type', 'hazard');
+          zone.setData('id', h.id);
+        } else {
+          this.hazardZones.add(zone);
+          this.physics.add.existing(zone, true);
+          (zone.body as Phaser.Physics.Arcade.StaticBody).setSize(h.w, h.h);
+          this.physics.add.overlap(this.player, zone, () => this.handleDeath());
+        }
+      }
+    }
+  }
+
+  private buildResizeHandles(): void {
+    const platform = this.level.platforms.find((p) => p.id === this.selectedEntityId);
+    if (!platform) return;
+    const right = this.add.rectangle(
+      platform.x + platform.w,
+      platform.y + platform.h / 2,
+      8,
+      16,
+      0xffff00,
+      0.8
+    );
+    right.setInteractive({ draggable: true });
+    right.setData('type', 'resize-r');
+    right.setData('platformId', platform.id);
+    right.setDepth(1001);
+    this.resizeHandles.push(right);
+  }
+
+  private checkWinCondition(): void {
+    const wc = this.level.winCondition ?? { type: 'portal' as const };
+    if (wc.type === 'coins') {
+      if (this.coinsCollected >= (wc.target ?? 1)) this.handleWin();
+    } else if (wc.type === 'enemies') {
+      if (this.enemiesDefeated >= (wc.target ?? 1)) this.handleWin();
+    }
   }
 
   private setupPlayPhysics(): void {
@@ -434,12 +572,35 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.setupPortalOverlap();
+    this.setupCollectiblePhysics();
+  }
+
+  private setupCollectiblePhysics(): void {
+    for (const coin of this.coinSprites) {
+      if (!coin.active) continue;
+      this.physics.add.overlap(this.player, coin, () => {
+        if (!coin.active) return;
+        coin.destroy();
+        this.coinsCollected++;
+        Sfx.coin();
+        this.checkWinCondition();
+      });
+    }
+    for (const flag of this.checkpointMarkers) {
+      this.physics.add.overlap(this.player, flag, () => {
+        this.lastCheckpoint = { x: flag.x, y: flag.y };
+      });
+    }
   }
 
   private setupPortalOverlap(): void {
     if (this.portalZone) {
       this.physics.add.overlap(this.player, this.portalZone, () => {
-        this.handleWin();
+        const wc = this.level.winCondition ?? { type: 'portal' as const };
+        if (wc.type === 'portal') {
+          Sfx.portal();
+          this.handleWin();
+        }
       });
     }
   }
@@ -454,6 +615,7 @@ export class GameScene extends Phaser.Scene {
 
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+      this.callbacks.onCursorMove?.(world.x, world.y);
 
       if (this.editorTool === 'delete' && this.deleteHighlight) {
         const hit = this.findEntityAt(world.x, world.y);
@@ -524,6 +686,7 @@ export class GameScene extends Phaser.Scene {
           h: 32,
           solid: true,
           presetId: this.defaultPlatformPreset,
+          assetId: this.level.defaultPlatformAssetId,
         };
         const snapped = snapPlatformAdjacent({ ...newPlat, x, y }, this.level.platforms);
         newPlat.x = snapped.x;
@@ -548,6 +711,31 @@ export class GameScene extends Phaser.Scene {
           y: pos.y,
         };
         this.rebuildAndEmit();
+      } else if (this.editorTool === 'coin') {
+        this.level.coins = [
+          ...(this.level.coins ?? []),
+          { id: `c-${Date.now()}`, x, y },
+        ];
+        this.rebuildAndEmit();
+      } else if (this.editorTool === 'checkpoint') {
+        const pos = snapToPlatformSurface(x, y, this.level.platforms);
+        this.level.checkpoints = [
+          ...(this.level.checkpoints ?? []),
+          { id: `cp-${Date.now()}`, x: pos.x, y: pos.y },
+        ];
+        this.rebuildAndEmit();
+      } else if (this.editorTool === 'decoration') {
+        this.level.decorations = [
+          ...(this.level.decorations ?? []),
+          { id: `d-${Date.now()}`, x, y, w: 16, h: 16 },
+        ];
+        this.rebuildAndEmit();
+      } else if (this.editorTool === 'hazard') {
+        this.level.hazards = [
+          ...(this.level.hazards ?? []),
+          { id: `h-${Date.now()}`, x: x - 16, y: y - 8, w: 32, h: 16, type: 'spike' },
+        ];
+        this.rebuildAndEmit();
       }
     });
 
@@ -566,6 +754,15 @@ export class GameScene extends Phaser.Scene {
       const id = gameObject.getData('id') as string;
       const snapX = Math.round(dragX / GRID_SNAP) * GRID_SNAP;
       const snapY = Math.round(dragY / GRID_SNAP) * GRID_SNAP;
+
+      if (type === 'resize-r') {
+        const pid = gameObject.getData('platformId') as string;
+        const p = this.level.platforms.find((pl) => pl.id === pid);
+        if (p) {
+          p.w = Math.max(32, Math.round((snapX - p.x) / GRID_SNAP) * GRID_SNAP);
+        }
+        return;
+      }
 
       if (type === 'platform') {
         const entity = this.platformEntities.find((pe) => pe.id === id);
@@ -627,6 +824,27 @@ export class GameScene extends Phaser.Scene {
       } else if (type === 'portal') {
         const snapped = snapToPlatformSurface(x, y, this.level.platforms, PORTAL_H);
         this.level.portal = { ...this.level.portal, x: snapped.x, y: snapped.y };
+      } else if (type === 'coin') {
+        const c = this.level.coins?.find((coin) => coin.id === id);
+        if (c) {
+          c.x = x;
+          c.y = y;
+        }
+      } else if (type === 'checkpoint') {
+        const snapped = snapToPlatformSurface(x, y, this.level.platforms);
+        const cp = this.level.checkpoints?.find((c) => c.id === id);
+        if (cp) {
+          cp.x = snapped.x;
+          cp.y = snapped.y;
+        }
+      } else if (type === 'decoration') {
+        const d = this.level.decorations?.find((dec) => dec.id === id);
+        if (d) {
+          d.x = x;
+          d.y = y;
+        }
+      } else if (type === 'resize-r') {
+        return;
       }
 
       this.rebuildAndEmit();
@@ -637,6 +855,10 @@ export class GameScene extends Phaser.Scene {
         .map((pe) => pe.getDraggable())
         .filter(Boolean),
       ...this.editorEnemySprites,
+      ...this.coinSprites,
+      ...this.checkpointMarkers,
+      ...this.decorationSprites,
+      ...this.resizeHandles,
       this.spawnMarker,
       this.portalMarker,
     ].filter(Boolean) as Phaser.GameObjects.GameObject[];
@@ -666,16 +888,23 @@ export class GameScene extends Phaser.Scene {
   private handleDeath(): void {
     if (this.won) return;
     this.deathCount++;
+    Sfx.hurt();
     this.playerAnimCtrl?.triggerOneShot('hurt');
-    this.player.setPosition(this.level.spawn.x, this.level.spawn.y);
+    const respawn = this.lastCheckpoint ?? this.level.spawn;
+    this.player.setPosition(respawn.x, respawn.y);
     this.player.setVelocity(0, 0);
     this.callbacks.onDeath?.();
   }
 
   private handleWin(): void {
     if (this.won) return;
+    const wc = this.level.winCondition ?? { type: 'portal' as const };
+    if (wc.type !== 'portal' && wc.type !== 'coins' && wc.type !== 'enemies') {
+      /* survive handled in update */
+    }
     this.won = true;
     this.player.setVelocity(0, 0);
+    Sfx.win();
     const timeMs = Date.now() - this.runStartedAt;
     this.callbacks.onWin?.({ timeMs, deaths: this.deathCount });
   }
@@ -709,6 +938,16 @@ export class GameScene extends Phaser.Scene {
         if (cursors.right.isDown) this.cameraCtrl.panBy(speed, 0);
         if (cursors.up.isDown) this.cameraCtrl.panBy(0, -speed);
         if (cursors.down.isDown) this.cameraCtrl.panBy(0, speed);
+      }
+      const cam = this.cameras.main;
+      this.callbacks.onCameraChange?.(cam.scrollX, cam.scrollY, cam.zoom);
+    }
+
+    if (this.mode === 'play' && !this.won) {
+      const wc = this.level.winCondition;
+      if (wc?.type === 'survive' && wc.target) {
+        const elapsed = (Date.now() - this.runStartedAt) / 1000;
+        if (elapsed >= wc.target) this.handleWin();
       }
     }
   }

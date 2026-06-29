@@ -11,6 +11,7 @@ export class TriangleEnemy extends Phaser.Physics.Arcade.Sprite {
   private chaseRange = 320;
   private hopTimer = 0;
   private hopInterval = 1200;
+  private moveSpeed = 80;
   private animCtrl?: AnimationController | null;
 
   constructor(scene: Phaser.Scene, def: EnemyDef, assets: AssetSchema[] = []) {
@@ -40,6 +41,8 @@ export class TriangleEnemy extends Phaser.Physics.Arcade.Sprite {
     this.behavior = def.behavior;
     this.patrolRange = def.patrolRange ?? 128;
     this.startX = def.x;
+    this.direction = def.direction ?? 1;
+    this.moveSpeed = def.speed ?? 80;
 
     this.animCtrl = initSpriteAnimation(this, asset);
     if (!this.animCtrl) {
@@ -76,7 +79,7 @@ export class TriangleEnemy extends Phaser.Physics.Arcade.Sprite {
     const dist = this.x - this.startX;
     if (dist > this.patrolRange) this.direction = -1;
     if (dist < -this.patrolRange) this.direction = 1;
-    const speed = this.behavior === 'hopper' ? 60 : 80;
+    const speed = this.behavior === 'hopper' ? Math.min(this.moveSpeed, 80) : this.moveSpeed;
     this.setVelocityX(this.direction * speed);
     this.setFlipX(this.direction < 0);
   }

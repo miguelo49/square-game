@@ -10,6 +10,7 @@ import { MusicHub } from './routes/MusicHub';
 import { MusicEditorPage } from './routes/MusicEditor';
 import { SkillsHub } from './routes/SkillsHub';
 import { CommunityPage } from './routes/CommunityPage';
+import { UserProfilePage } from './routes/UserProfilePage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore();
@@ -97,6 +98,14 @@ function App() {
           element={
             <ProtectedRoute>
               <CommunityPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/:nickname"
+          element={
+            <ProtectedRoute>
+              <UserProfilePage />
             </ProtectedRoute>
           }
         />

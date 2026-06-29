@@ -75,14 +75,24 @@ export function migratePlatformDef(p: PlatformDef): PlatformDef {
   return rest;
 }
 
-export function migrateLevel<T extends { portal?: { x: number; y: number; w: number; h: number }; width: number; height: number; platforms: PlatformDef[] }>(
+export function migrateLevel<T extends { portal?: { x: number; y: number; w: number; h: number }; width: number; height: number; platforms: PlatformDef[]; coins?: unknown[]; checkpoints?: unknown[] }>(
   level: T
 ): T & { portal: { x: number; y: number; w: number; h: number } } {
   const migratedPlatforms = level.platforms
     .filter((p) => !p.runtimeOnly)
     .map(migratePlatformDef);
-  if (level.portal) {
-    return { ...level, platforms: migratedPlatforms } as T & { portal: { x: number; y: number; w: number; h: number } };
+  const base = {
+    ...level,
+    platforms: migratedPlatforms,
+    coins: level.coins ?? [],
+    checkpoints: level.checkpoints ?? [],
+    decorations: (level as { decorations?: unknown[] }).decorations ?? [],
+    hazards: (level as { hazards?: unknown[] }).hazards ?? [],
+    winCondition: (level as { winCondition?: unknown }).winCondition ?? { type: 'portal' },
+  };
+
+  if (base.portal) {
+    return base as T & { portal: { x: number; y: number; w: number; h: number } };
   }
 
   const ground = level.platforms[0];
@@ -90,13 +100,12 @@ export function migrateLevel<T extends { portal?: { x: number; y: number; w: num
   const surfaceY = ground?.y ?? level.height - 64;
 
   return {
-    ...level,
-    platforms: migratedPlatforms,
+    ...base,
     portal: {
       x: portalX,
       y: entityCenterYOnSurface(surfaceY, PORTAL_H),
       w: 32,
       h: PORTAL_H,
     },
-  };
+  } as T & { portal: { x: number; y: number; w: number; h: number } };
 }

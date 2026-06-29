@@ -17,10 +17,11 @@ export class EditorGhost {
     this.rect.setVisible(false);
   }
 
-  showTopLeft(x: number, y: number): void {
+  showTopLeft(x: number, y: number, w = DEFAULT_W, h = DEFAULT_H): void {
     const sx = Math.round(x / GRID_SNAP) * GRID_SNAP;
     const sy = Math.round(y / GRID_SNAP) * GRID_SNAP;
-    this.rect.setPosition(sx + DEFAULT_W / 2, sy + DEFAULT_H / 2);
+    this.rect.setSize(w, h);
+    this.rect.setPosition(sx + w / 2, sy + h / 2);
     this.rect.setVisible(true);
     this.visible = true;
   }

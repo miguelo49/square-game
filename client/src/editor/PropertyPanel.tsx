@@ -1,6 +1,7 @@
 import type { LevelSchema } from '../types';
 import type { MusicTrackRef } from '../hooks/useGameContent';
 import { estimateLevelSize } from '../storage/compression';
+import { LEVEL_THEMES, applyTheme } from '../data/levelThemes';
 import { MusicPlayer } from '../audio/MusicPlayer';
 import { useEffect, useRef, useState } from 'react';
 
@@ -11,6 +12,7 @@ interface PropertyPanelProps {
   onNameChange: (name: string) => void;
   onEditMusic?: () => void;
   musicTracks?: MusicTrackRef[];
+  assets?: import('../types').AssetSchema[];
 }
 
 export function PropertyPanel({
@@ -20,6 +22,7 @@ export function PropertyPanel({
   onNameChange,
   onEditMusic,
   musicTracks = [],
+  assets = [],
 }: PropertyPanelProps) {
   const size = estimateLevelSize(level);
   const previewPlayer = useRef<MusicPlayer | null>(null);
@@ -89,7 +92,99 @@ export function PropertyPanel({
         />
       </label>
       <label>
-        Color de fondo
+        Tema
+        <select
+          className="retro-input"
+          value={level.themeId ?? 'void'}
+          onChange={(e) => onChange({ ...level, ...applyTheme(e.target.value) })}
+        >
+          {Object.values(LEVEL_THEMES).map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Asset jugador
+        <select
+          className="retro-input"
+          value={level.playerAssetId ?? ''}
+          onChange={(e) =>
+            onChange({ ...level, playerAssetId: e.target.value || undefined })
+          }
+        >
+          <option value="">— Default —</option>
+          {assets
+            .filter((a) => a.category === 'player')
+            .map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name ?? a.id}
+              </option>
+            ))}
+        </select>
+      </label>
+      <label>
+        Tile plataforma default
+        <select
+          className="retro-input"
+          value={level.defaultPlatformAssetId ?? ''}
+          onChange={(e) =>
+            onChange({ ...level, defaultPlatformAssetId: e.target.value || undefined })
+          }
+        >
+          <option value="">— Default —</option>
+          {assets
+            .filter((a) => a.category === 'platform')
+            .map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name ?? a.id}
+              </option>
+            ))}
+        </select>
+      </label>
+      <label>
+        Victoria
+        <select
+          className="retro-input"
+          value={level.winCondition?.type ?? 'portal'}
+          onChange={(e) =>
+            onChange({
+              ...level,
+              winCondition: {
+                type: e.target.value as 'portal' | 'coins' | 'enemies' | 'survive',
+                target: level.winCondition?.target,
+              },
+            })
+          }
+        >
+          <option value="portal">Llegar al portal</option>
+          <option value="coins">Recoger monedas</option>
+          <option value="enemies">Derrotar enemigos</option>
+          <option value="survive">Sobrevivir tiempo</option>
+        </select>
+      </label>
+      {level.winCondition?.type && level.winCondition.type !== 'portal' && (
+        <label>
+          Objetivo
+          <input
+            type="number"
+            className="retro-input"
+            min={1}
+            value={level.winCondition.target ?? 1}
+            onChange={(e) =>
+              onChange({
+                ...level,
+                winCondition: {
+                  ...level.winCondition!,
+                  target: Number(e.target.value),
+                },
+              })
+            }
+          />
+        </label>
+      )}
+      <label>
         <input
           type="color"
           value={level.backgroundColor}
@@ -168,7 +263,8 @@ export function PropertyPanel({
       </div>
       <div className="stats">
         <p>Plataformas: {level.platforms.length}</p>
-        <p>Enemigos: {level.enemies.length}</p>
+        <p>Monedas: {level.coins?.length ?? 0}</p>
+        <p>Checkpoints: {level.checkpoints?.length ?? 0}</p>
         <p>Spawn: ({level.spawn.x}, {level.spawn.y})</p>
         <p>Portal: ({level.portal.x}, {level.portal.y})</p>
         <p>Tamaño JSON: ~{(size / 1024).toFixed(1)} KB</p>

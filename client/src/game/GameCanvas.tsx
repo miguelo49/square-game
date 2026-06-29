@@ -13,12 +13,16 @@ interface GameCanvasProps {
   assets?: AssetSchema[];
   extraAssets?: AssetSchema[];
   mode?: GameMode;
+  playtest?: boolean;
   editorTool?: string;
   selectedEnemy?: SelectedEnemyConfig;
   selectedEntityId?: string | null;
   defaultPlatformPreset?: string;
+  showGrid?: boolean;
   onLevelChange?: (level: LevelSchema) => void;
   onEditorSelect?: (type: string, id: string) => void;
+  onCursorMove?: (x: number, y: number) => void;
+  onCameraChange?: (x: number, y: number, zoom: number) => void;
   onDeath?: () => void;
   onWin?: (result: RunResult) => void;
   musicTracks?: MusicTrackRef[];
@@ -30,12 +34,16 @@ export function GameCanvas({
   assets = [],
   extraAssets = [],
   mode = 'play',
+  playtest = false,
   editorTool = 'select',
   selectedEnemy,
   selectedEntityId,
   defaultPlatformPreset = 'static',
+  showGrid = true,
   onLevelChange,
   onEditorSelect,
+  onCursorMove,
+  onCameraChange,
   onDeath,
   onWin,
   musicTracks = [],
@@ -44,14 +52,8 @@ export function GameCanvas({
   const gameRef = useRef<Phaser.Game | null>(null);
   const musicRef = useRef<MusicPlayer | null>(null);
   const bootedRef = useRef(false);
-  const mergedAssets = useMemo(
-    () => mergeById(assets, extraAssets),
-    [assets, extraAssets]
-  );
-  const assetsKey = useMemo(
-    () => mergedAssets.map((a) => a.id).join(','),
-    [mergedAssets]
-  );
+  const mergedAssets = useMemo(() => mergeById(assets, extraAssets), [assets, extraAssets]);
+  const assetsKey = useMemo(() => mergedAssets.map((a) => a.id).join(','), [mergedAssets]);
 
   const propsRef = useRef({
     level,
@@ -62,9 +64,12 @@ export function GameCanvas({
     selectedEnemy,
     selectedEntityId,
     defaultPlatformPreset,
+    showGrid,
     onDeath,
     onWin,
     onEditorSelect,
+    onCursorMove,
+    onCameraChange,
   });
 
   propsRef.current = {
@@ -76,17 +81,17 @@ export function GameCanvas({
     selectedEnemy,
     selectedEntityId,
     defaultPlatformPreset,
+    showGrid,
     onDeath,
     onWin,
     onEditorSelect,
+    onCursorMove,
+    onCameraChange,
   };
 
   const levelKey = useMemo(() => JSON.stringify(level), [level]);
-  const skillsKey = useMemo(
-    () => skills.map((s) => s.id).join(','),
-    [skills]
-  );
-  const presetKey = defaultPlatformPreset;
+  const skillsKey = useMemo(() => skills.map((s) => s.id).join(','), [skills]);
+  const prevModeRef = useRef(mode);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -110,11 +115,16 @@ export function GameCanvas({
         selectedEnemy: p.selectedEnemy,
         selectedEntityId: p.selectedEntityId,
         defaultPlatformPreset: p.defaultPlatformPreset,
+        showGrid: p.showGrid,
         callbacks: {
           onDeath: () => propsRef.current.onDeath?.(),
           onWin: (result: RunResult) => propsRef.current.onWin?.(result),
           onEditorSelect: (type: string, id: string) =>
             propsRef.current.onEditorSelect?.(type, id),
+          onCursorMove: (x: number, y: number) =>
+            propsRef.current.onCursorMove?.(x, y),
+          onCameraChange: (x: number, y: number, zoom: number) =>
+            propsRef.current.onCameraChange?.(x, y, zoom),
         },
       });
     };
@@ -148,7 +158,18 @@ export function GameCanvas({
     if (!game?.isBooted || !bootedRef.current) return;
 
     const p = propsRef.current;
-    const scene = game.scene.getScene('GameScene');
+    const scene = game.scene.getScene('GameScene') as GameScene | undefined;
+    const modeChanged = prevModeRef.current !== mode;
+    prevModeRef.current = mode;
+
+    if (scene?.scene.isActive() && !modeChanged) {
+      scene.events.emit('update-level', p.level);
+      scene.events.emit('set-tool', p.editorTool);
+      scene.events.emit('set-selected-entity', p.selectedEntityId ?? null);
+      scene.events.emit('set-grid-visible', p.showGrid);
+      return;
+    }
+
     const payload = {
       level: p.level,
       skills: p.skills,
@@ -158,11 +179,16 @@ export function GameCanvas({
       selectedEnemy: p.selectedEnemy,
       selectedEntityId: p.selectedEntityId,
       defaultPlatformPreset: p.defaultPlatformPreset,
+      showGrid: p.showGrid,
       callbacks: {
         onDeath: () => propsRef.current.onDeath?.(),
         onWin: (result: RunResult) => propsRef.current.onWin?.(result),
         onEditorSelect: (type: string, id: string) =>
           propsRef.current.onEditorSelect?.(type, id),
+        onCursorMove: (x: number, y: number) =>
+          propsRef.current.onCursorMove?.(x, y),
+        onCameraChange: (x: number, y: number, zoom: number) =>
+          propsRef.current.onCameraChange?.(x, y, zoom),
       },
     };
 
@@ -171,7 +197,7 @@ export function GameCanvas({
     } else {
       game.scene.start('GameScene', payload);
     }
-  }, [levelKey, skillsKey, assetsKey, mode, editorTool, presetKey]);
+  }, [levelKey, skillsKey, assetsKey, mode, editorTool, defaultPlatformPreset, showGrid]);
 
   useEffect(() => {
     const game = gameRef.current;
@@ -191,7 +217,7 @@ export function GameCanvas({
     if (!musicRef.current) musicRef.current = new MusicPlayer();
     const player = musicRef.current;
 
-    if (mode === 'play') {
+    if (mode === 'play' && !playtest) {
       const track = level.musicTrackId
         ? musicTracks.find((t) => t.id === level.musicTrackId)
         : undefined;
@@ -204,12 +230,16 @@ export function GameCanvas({
       } else {
         player.stop();
       }
+    } else if (mode === 'play' && playtest) {
+      if (level.music) void player.playSchema(level.music);
+      else if (level.musicSeed != null) void player.play(level.musicSeed);
+      else player.stop();
     } else {
       player.stop();
     }
 
     return () => player.stop();
-  }, [mode, level.music, level.musicSeed, level.musicTrackId, musicTracks]);
+  }, [mode, playtest, level.music, level.musicSeed, level.musicTrackId, musicTracks]);
 
   return (
     <div

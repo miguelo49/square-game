@@ -9,6 +9,8 @@
 :root {
   --bg: #0f0f23;
   --bg-panel: #1a1a3e;
+  --bg-dark: #0a0a18;
+  --panel: var(--bg-panel);
   --border: #4a4a8a;
   --accent: #00d4ff;
   --accent-dark: #0099cc;
@@ -25,7 +27,7 @@ body,
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.6;
   image-rendering: pixelated;
 }
@@ -75,6 +77,30 @@ body,
   margin: 8px 16px;
   font-size: 8px;
   color: var(--success);
+}
+
+.toast-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--bg-panel);
+  border: 2px solid var(--accent);
+  padding: 8px 16px;
+  margin: 8px 16px;
+  font-size: 8px;
+  color: var(--success);
+  z-index: 100;
+}
+
+.toast-close {
+  font-family: var(--font);
+  font-size: 8px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  padding: 4px;
 }
 
 .retro-btn {
@@ -129,8 +155,8 @@ body,
 
 label {
   display: block;
-  font-size: 7px;
-  color: #aaa;
+  font-size: 8px;
+  color: #bbb;
   margin-bottom: 12px;
 }
 
@@ -238,7 +264,6 @@ label {
   display: flex;
   flex: 1;
   min-height: 0;
-  height: calc(100vh - 60px);
 }
 
 .level-list {
@@ -330,8 +355,8 @@ label {
 }
 
 .level-author {
-  font-size: 6px;
-  opacity: 0.75;
+  font-size: 8px;
+  opacity: 0.85;
 }
 
 .empty-list {
@@ -344,11 +369,31 @@ label {
   flex: 1;
   position: relative;
   min-width: 0;
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+}
+
+.play-empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  text-align: center;
+}
+
+.sidebar-toggle-mobile {
+  display: none;
 }
 
 .game-canvas {
   width: 100%;
   height: 100%;
+  flex: 1;
+  min-height: 320px;
 }
 
 .game-canvas canvas {
@@ -369,6 +414,11 @@ label {
   min-height: 0;
 }
 
+.editor-sidebar-split {
+  width: 280px;
+  overflow-y: auto;
+}
+
 .asset-sidebar {
   width: 260px;
   background: var(--bg-panel);
@@ -378,6 +428,20 @@ label {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.editor-sidebar-tools,
+.editor-sidebar-inspector,
+.editor-sidebar-level {
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 12px;
+  margin-bottom: 8px;
+}
+
+.sidebar-section-title {
+  font-size: 8px;
+  color: var(--accent);
+  margin-bottom: 8px;
 }
 
 .editor-sidebar h3,
@@ -710,6 +774,239 @@ label {
   padding: 12px 16px;
   text-align: center;
   animation: pulse 1s ease-in-out infinite alternate;
+}
+
+.win-banner-clear {
+  background: linear-gradient(90deg, #4a0080, #0099cc);
+}
+
+.win-banner-playtest {
+  background: linear-gradient(90deg, #664400, #cc8800);
+  border-bottom-color: #ffaa00;
+}
+
+.level-status-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.status-badge {
+  font-size: 7px;
+  padding: 4px 8px;
+  border: 2px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.status-badge.draft {
+  border-color: #888;
+}
+
+.status-badge.saved {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.status-badge.public {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.status-badge.private {
+  border-color: #666;
+}
+
+.editor-status-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  background: rgba(15, 15, 35, 0.92);
+  border-top: 2px solid var(--border);
+  font-size: 7px;
+  color: #bbb;
+  z-index: 20;
+}
+
+.editor-status-bar .warn {
+  color: #ffaa00;
+}
+
+.playtest-overlay {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(204, 136, 0, 0.9);
+  color: #000;
+  padding: 6px 16px;
+  font-size: 9px;
+  z-index: 15;
+  pointer-events: none;
+}
+
+.minimap {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border: 2px solid var(--border);
+  background: var(--bg-dark);
+  z-index: 15;
+  cursor: crosshair;
+}
+
+.level-thumb {
+  width: 48px;
+  height: 28px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.community-banner {
+  font-size: 8px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: var(--bg-panel);
+  border: 2px solid var(--border);
+}
+
+@media (max-width: 1024px) {
+  .editor-sidebar,
+  .asset-sidebar,
+  .music-hub-sidebar,
+  .skills-hub-list {
+    position: fixed;
+    left: 0;
+    top: 60px;
+    bottom: 0;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.2s;
+    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.5);
+  }
+
+  .editor-sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Play page: lista arriba + juego abajo (siempre visible) */
+  .play-layout {
+    flex-direction: column;
+    height: auto;
+    min-height: calc(100vh - 60px);
+  }
+
+  .play-page .level-list {
+    position: relative;
+    top: auto;
+    bottom: auto;
+    width: 100%;
+    max-height: 42vh;
+    transform: none;
+    box-shadow: none;
+    z-index: auto;
+    border-right: none;
+    border-bottom: 3px solid var(--border);
+  }
+
+  .play-page .level-list:not(.open) .level-sidebar-meta {
+    display: none;
+  }
+
+  .play-page .level-list.open {
+    transform: none;
+    max-height: 85vh;
+  }
+
+  .play-page .level-list.open .level-sidebar-meta {
+    display: block;
+  }
+
+  .play-page .game-panel {
+    flex: 1;
+    min-height: 50vh;
+  }
+
+  .play-page .game-canvas {
+    min-height: 50vh;
+  }
+
+  .sidebar-toggle-mobile {
+    display: inline-block;
+  }
+
+  .sidebar-toggle {
+    display: inline-block;
+  }
+}
+
+.sidebar-toggle {
+  display: none;
+}
+
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.onboarding-box {
+  background: var(--bg-panel);
+  border: 4px solid var(--accent);
+  padding: 24px;
+  max-width: 480px;
+  text-align: center;
+}
+
+.onboarding-box p {
+  font-size: 8px;
+  line-height: 1.8;
+  margin: 12px 0;
+}
+
+.music-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.music-modal {
+  width: 95vw;
+  height: 90vh;
+  background: var(--bg);
+  border: 3px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+
+.shortcuts-panel {
+  font-size: 7px;
+  line-height: 1.8;
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--bg);
+  border: 2px solid var(--border);
+}
+
+.shortcuts-panel summary {
+  cursor: pointer;
+  color: var(--accent);
 }
 
 @keyframes pulse {
@@ -1094,7 +1391,7 @@ label {
 }
 
 .preset-chip {
-  font-size: 6px;
+  font-size: 8px;
 }
 
 .skill-anim-tag {
@@ -1114,4 +1411,93 @@ label {
   font-size: 6px;
   line-height: 1.4;
   margin-top: 4px;
+}
+
+.level-social-panel {
+  margin: 12px 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.level-stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 8px;
+  color: #bbb;
+  margin: 6px 0;
+}
+
+.level-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 6px 0;
+}
+
+.tag-chip {
+  font-size: 7px;
+  padding: 2px 6px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+
+.like-btn.active {
+  color: #ff6688;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.comments-section {
+  margin-top: 10px;
+}
+
+.comment-compose {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.comment-compose .retro-input {
+  flex: 1;
+}
+
+.comment-list {
+  list-style: none;
+  max-height: 120px;
+  overflow-y: auto;
+  font-size: 8px;
+  color: #bbb;
+}
+
+.comment-list li {
+  margin-bottom: 4px;
+}
+
+.community-sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.tags-field {
+  display: block;
+  margin-top: 12px;
+  font-size: 8px;
+}
+
+.profile-page .community-list {
+  padding: 0 16px 24px;
 }

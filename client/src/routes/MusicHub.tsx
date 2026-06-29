@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { LevelSchema, MusicSchema } from '../types';
 import { MusicEditor } from './MusicEditor';
@@ -8,6 +8,7 @@ import { downloadSqmusic, importSqmusic } from '../storage/compression';
 
 export function MusicHub() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [tracks, setTracks] = useState<
     Array<{ id: string; name: string; data: MusicSchema; isPublic?: boolean }>
   >([]);
@@ -27,6 +28,13 @@ export function MusicHub() {
   useEffect(() => {
     loadTracks();
   }, [loadTracks]);
+
+  useEffect(() => {
+    const id = searchParams.get('id');
+    if (!id || tracks.length === 0) return;
+    const t = tracks.find((tr) => tr.id === id);
+    if (t) loadTrack(t);
+  }, [searchParams, tracks]);
 
   const startNew = () => {
     setSelectedId(null);

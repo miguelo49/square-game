@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { api } from '../api/client';
 import type { AssetSchema, AssetCategory, AssetAnimClip, AssetClipDef } from '../types';
@@ -9,8 +9,12 @@ import { migrateAssetAnimations } from '../game/utils/assetAnimations';
 import { downloadSqasset, importSqasset } from '../storage/compression';
 import { ALLOWED_SIZES } from '../data/retroLimits';
 
+import { Toast } from '../components/Toast';
+import { useToast } from '../hooks/useToast';
+
 export function AssetEditor() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [category, setCategory] = useState<AssetCategory>('player');
   const [size, setSize] = useState<number>(() => createEmptyAsset('player').width);
   const [name, setName] = useState('Mi Asset');
@@ -25,10 +29,30 @@ export function AssetEditor() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isPublic, setIsPublic] = useState(false);
   const [message, setMessage] = useState('');
+  const { message: toast, show, dismiss } = useToast();
+
+  const loadAsset = (a: { id: string; name: string; data: AssetSchema; isPublic?: boolean }) => {
+    setEditingId(a.id);
+    setIsPublic(a.isPublic ?? false);
+    setName(a.name);
+    setCategory(a.data.category);
+    setSize(a.data.width);
+    setPixels([...a.data.pixels]);
+    setAnimations(JSON.parse(JSON.stringify(migrateAssetAnimations(a.data))));
+    setPaletteSlots([...a.data.paletteSlots]);
+  };
 
   useEffect(() => {
     api.assets.list().then(setAssets);
   }, []);
+
+  useEffect(() => {
+    const id = searchParams.get('id');
+    if (!id) return;
+    void api.assets.get(id).then((a) => {
+      loadAsset({ id: a.id, name: a.name, data: a.data, isPublic: a.isPublic });
+    }).catch(() => show('Asset no encontrado'));
+  }, [searchParams, show]);
 
   const handleCategoryChange = (cat: AssetCategory) => {
     setCategory(cat);
@@ -102,17 +126,6 @@ export function AssetEditor() {
     } catch (e) {
       setMessage((e as Error).message);
     }
-  };
-
-  const loadAsset = (a: { id: string; name: string; data: AssetSchema; isPublic?: boolean }) => {
-    setEditingId(a.id);
-    setIsPublic(a.isPublic ?? false);
-    setName(a.name);
-    setCategory(a.data.category);
-    setSize(a.data.width);
-    setPixels([...a.data.pixels]);
-    setAnimations(JSON.parse(JSON.stringify(migrateAssetAnimations(a.data))));
-    setPaletteSlots([...a.data.paletteSlots]);
   };
 
   const handleDelete = async (id: string) => {
@@ -203,7 +216,8 @@ export function AssetEditor() {
         </div>
       </header>
 
-      {message && <p className="toast">{message}</p>}
+      {message && <Toast message={message} onDismiss={() => setMessage('')} />}
+      {toast && <Toast message={toast} onDismiss={dismiss} />}
 
       <div className="asset-layout">
         <aside className="asset-sidebar">

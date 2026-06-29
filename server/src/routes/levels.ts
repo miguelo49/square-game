@@ -39,22 +39,31 @@ export async function levelRoutes(app: FastifyInstance): Promise<void> {
     }));
   });
 
-  app.get('/api/levels/public', async () => {
+  app.get('/api/levels/public', async (request) => {
+    const userId = request.user!.userId;
     const rows = db
       .prepare(
-        `SELECT l.id, l.name, l.data, l.updated_at, u.nickname AS author_nickname
+        `SELECT l.id, l.name, l.data, l.updated_at, l.play_count, l.clear_count, l.tags,
+          u.nickname AS author_nickname,
+          (SELECT COUNT(*) FROM level_likes WHERE level_id = l.id) AS like_count,
+          (SELECT 1 FROM level_likes WHERE level_id = l.id AND user_id = ?) AS user_liked
          FROM levels l
          JOIN users u ON u.id = l.user_id
          WHERE l.is_public = 1 AND l.is_demo = 0
          ORDER BY l.updated_at DESC
          LIMIT 100`
       )
-      .all() as Array<{
+      .all(userId) as Array<{
       id: string;
       name: string;
       data: string;
       updated_at: number;
+      play_count: number;
+      clear_count: number;
+      tags: string;
       author_nickname: string;
+      like_count: number;
+      user_liked: number | null;
     }>;
 
     return rows.map((r) => ({
@@ -63,6 +72,12 @@ export async function levelRoutes(app: FastifyInstance): Promise<void> {
       data: JSON.parse(r.data),
       authorNickname: r.author_nickname,
       updatedAt: r.updated_at,
+      playCount: r.play_count,
+      clearCount: r.clear_count,
+      likeCount: r.like_count,
+      clearRate: r.play_count > 0 ? Math.round((r.clear_count / r.play_count) * 100) : 0,
+      tags: JSON.parse(r.tags || '[]') as string[],
+      userLiked: !!r.user_liked,
     }));
   });
 
@@ -188,6 +203,9 @@ export async function levelRoutes(app: FastifyInstance): Promise<void> {
            VALUES (?, ?, ?, ?, ?)`
         ).run(levelId, userId, timeMs, deaths, now);
         isPersonalBest = true;
+        db.prepare(
+          'UPDATE levels SET clear_count = clear_count + 1 WHERE id = ?'
+        ).run(levelId);
       } else if (timeMs < existing.time_ms) {
         db.prepare(
           `UPDATE level_best_scores SET time_ms = ?, deaths = ?, achieved_at = ?
@@ -245,10 +263,10 @@ export async function levelRoutes(app: FastifyInstance): Promise<void> {
       const userId = request.user!.userId;
       const row = db
         .prepare(
-          'SELECT id, is_demo, is_public FROM levels WHERE id = ? AND user_id = ?'
+          'SELECT id, is_demo, is_public, author_cleared FROM levels WHERE id = ? AND user_id = ?'
         )
         .get(request.params.id, userId) as
-        | { id: string; is_demo: number; is_public: number }
+        | { id: string; is_demo: number; is_public: number; author_cleared: number }
         | undefined;
 
       if (!row) return reply.code(404).send({ error: 'Nivel no encontrado' });
@@ -257,12 +275,123 @@ export async function levelRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const nextPublic = row.is_public === 1 ? 0 : 1;
+      if (nextPublic === 1 && row.author_cleared !== 1) {
+        return reply.code(400).send({
+          error: 'Completa el playtest antes de compartir',
+        });
+      }
+
       const now = Math.floor(Date.now() / 1000);
       db.prepare(
         'UPDATE levels SET is_public = ?, updated_at = ? WHERE id = ?'
       ).run(nextPublic, now, request.params.id);
 
       return { isPublic: nextPublic === 1 };
+    }
+  );
+
+  app.post<{ Params: { id: string } }>(
+    '/api/levels/:id/clear-test',
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      const row = db
+        .prepare('SELECT id FROM levels WHERE id = ? AND user_id = ?')
+        .get(request.params.id, userId);
+
+      if (!row) return reply.code(404).send({ error: 'Nivel no encontrado' });
+
+      db.prepare('UPDATE levels SET author_cleared = 1 WHERE id = ?').run(
+        request.params.id
+      );
+      return { cleared: true };
+    }
+  );
+
+  app.post<{ Params: { id: string } }>(
+    '/api/levels/:id/play',
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      if (!canPlayLevel(request.params.id, userId)) {
+        return reply.code(404).send({ error: 'Nivel no encontrado' });
+      }
+      db.prepare(
+        'UPDATE levels SET play_count = play_count + 1 WHERE id = ?'
+      ).run(request.params.id);
+      return { ok: true };
+    }
+  );
+
+  app.post<{ Params: { id: string } }>(
+    '/api/levels/:id/like',
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      if (!canPlayLevel(request.params.id, userId)) {
+        return reply.code(404).send({ error: 'Nivel no encontrado' });
+      }
+      const existing = db
+        .prepare('SELECT 1 FROM level_likes WHERE user_id = ? AND level_id = ?')
+        .get(userId, request.params.id);
+      if (existing) {
+        db.prepare('DELETE FROM level_likes WHERE user_id = ? AND level_id = ?').run(
+          userId,
+          request.params.id
+        );
+        return { liked: false };
+      }
+      db.prepare(
+        'INSERT INTO level_likes (user_id, level_id) VALUES (?, ?)'
+      ).run(userId, request.params.id);
+      return { liked: true };
+    }
+  );
+
+  app.get<{ Params: { id: string } }>(
+    '/api/levels/:id/comments',
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      if (!canPlayLevel(request.params.id, userId)) {
+        return reply.code(404).send({ error: 'Nivel no encontrado' });
+      }
+      const rows = db
+        .prepare(
+          `SELECT c.id, c.body, c.created_at, u.nickname
+           FROM level_comments c
+           JOIN users u ON u.id = c.user_id
+           WHERE c.level_id = ?
+           ORDER BY c.created_at DESC
+           LIMIT 50`
+        )
+        .all(request.params.id) as Array<{
+        id: string;
+        body: string;
+        created_at: number;
+        nickname: string;
+      }>;
+      return rows.map((r) => ({
+        id: r.id,
+        body: r.body,
+        createdAt: r.created_at,
+        nickname: r.nickname,
+      }));
+    }
+  );
+
+  app.post<{ Params: { id: string }; Body: { body?: string } }>(
+    '/api/levels/:id/comments',
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      if (!canPlayLevel(request.params.id, userId)) {
+        return reply.code(404).send({ error: 'Nivel no encontrado' });
+      }
+      const body = (request.body?.body ?? '').trim();
+      if (!body || body.length > 500) {
+        return reply.code(400).send({ error: 'Comentario inválido' });
+      }
+      const id = uuidv4();
+      db.prepare(
+        'INSERT INTO level_comments (id, level_id, user_id, body) VALUES (?, ?, ?, ?)'
+      ).run(id, request.params.id, userId, body);
+      return { id, body };
     }
   );
 
@@ -274,10 +403,29 @@ export async function levelRoutes(app: FastifyInstance): Promise<void> {
 
     const row = db
       .prepare(
-        `SELECT id, name, data, is_demo, is_public FROM levels WHERE id = ?`
+        `SELECT l.id, l.name, l.data, l.is_demo, l.is_public, l.author_cleared,
+          l.play_count, l.clear_count, l.tags, u.nickname AS author_nickname,
+          (SELECT COUNT(*) FROM level_likes WHERE level_id = l.id) AS like_count,
+          (SELECT 1 FROM level_likes WHERE user_id = ? AND level_id = l.id) AS user_liked
+         FROM levels l
+         LEFT JOIN users u ON u.id = l.user_id
+         WHERE l.id = ?`
       )
-      .get(request.params.id) as
-      | { id: string; name: string; data: string; is_demo: number; is_public: number }
+      .get(userId, request.params.id) as
+      | {
+          id: string;
+          name: string;
+          data: string;
+          is_demo: number;
+          is_public: number;
+          author_cleared: number;
+          play_count: number;
+          clear_count: number;
+          tags: string;
+          author_nickname: string | null;
+          like_count: number;
+          user_liked: number | null;
+        }
       | undefined;
 
     if (!row) return reply.code(404).send({ error: 'Nivel no encontrado' });
@@ -293,6 +441,14 @@ export async function levelRoutes(app: FastifyInstance): Promise<void> {
       isDemo: row.is_demo === 1,
       isPublic: row.is_public === 1,
       isFavorite: !!fav,
+      authorCleared: row.author_cleared === 1,
+      authorNickname: row.author_nickname ?? undefined,
+      playCount: row.play_count,
+      clearCount: row.clear_count,
+      likeCount: row.like_count,
+      clearRate: row.play_count > 0 ? Math.round((row.clear_count / row.play_count) * 100) : 0,
+      tags: JSON.parse(row.tags || '[]') as string[],
+      userLiked: !!row.user_liked,
     };
   });
 
@@ -323,7 +479,7 @@ export async function levelRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
-  app.put<{ Params: { id: string }; Body: { name?: string; data?: unknown } }>(
+  app.put<{ Params: { id: string }; Body: { name?: string; data?: unknown; tags?: string[] } }>(
     '/api/levels/:id',
     async (request, reply) => {
       const userId = request.user!.userId;
@@ -333,7 +489,7 @@ export async function levelRoutes(app: FastifyInstance): Promise<void> {
 
       if (!row) return reply.code(404).send({ error: 'Nivel no encontrado' });
 
-      const { name, data } = request.body ?? {};
+      const { name, data, tags } = request.body ?? {};
       const now = Math.floor(Date.now() / 1000);
 
       if (name && data) {
@@ -349,6 +505,18 @@ export async function levelRoutes(app: FastifyInstance): Promise<void> {
       } else if (data) {
         db.prepare('UPDATE levels SET data = ?, updated_at = ? WHERE id = ?').run(
           JSON.stringify(data),
+          now,
+          request.params.id
+        );
+      }
+
+      if (tags !== undefined) {
+        const clean = tags
+          .map((t) => t.trim().slice(0, 32))
+          .filter(Boolean)
+          .slice(0, 8);
+        db.prepare('UPDATE levels SET tags = ?, updated_at = ? WHERE id = ?').run(
+          JSON.stringify(clean),
           now,
           request.params.id
         );

@@ -114,6 +114,39 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_scores_level_time ON level_best_scores(level_id, time_ms);
 `);
 
+const levelCols2 = db.prepare('PRAGMA table_info(levels)').all() as Array<{ name: string }>;
+if (!levelCols2.some((c) => c.name === 'author_cleared')) {
+  db.exec(`ALTER TABLE levels ADD COLUMN author_cleared INTEGER NOT NULL DEFAULT 0;`);
+}
+if (!levelCols2.some((c) => c.name === 'tags')) {
+  db.exec(`ALTER TABLE levels ADD COLUMN tags TEXT NOT NULL DEFAULT '[]';`);
+}
+if (!levelCols2.some((c) => c.name === 'play_count')) {
+  db.exec(`ALTER TABLE levels ADD COLUMN play_count INTEGER NOT NULL DEFAULT 0;`);
+}
+if (!levelCols2.some((c) => c.name === 'clear_count')) {
+  db.exec(`ALTER TABLE levels ADD COLUMN clear_count INTEGER NOT NULL DEFAULT 0;`);
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS level_likes (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    level_id TEXT NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    PRIMARY KEY (user_id, level_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS level_comments (
+    id TEXT PRIMARY KEY,
+    level_id TEXT NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body TEXT NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_comments_level ON level_comments(level_id);
+`);
+
 export interface UserRow {
   id: string;
   nickname: string;

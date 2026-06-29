@@ -143,5 +143,9 @@ export function validateLevel(level: LevelSchema): string | null {
       return `Plataforma ${p.id}: máximo 5 reglas`;
     }
   }
+  const wc = level.winCondition;
+  if (wc && wc.type !== 'portal' && (wc.target ?? 0) < 1) {
+    return 'Objetivo de victoria inválido';
+  }
   return null;
 }

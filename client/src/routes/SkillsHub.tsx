@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { useGameContent } from '../hooks/useGameContent';
 import type { SkillSchema, SkillAction, SkillActionType, AssetAnimClip } from '../types';
@@ -13,6 +13,7 @@ const DEFAULT_ACTION = (): SkillAction => ({ type: 'jump', force: 420, animClip:
 
 export function SkillsHub() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { skills, assets, reload } = useGameContent();
   const [skillPublic, setSkillPublic] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<SkillSchema | null>(null);
@@ -28,6 +29,19 @@ export function SkillsHub() {
       setSkillPublic(map);
     });
   }, [skills]);
+
+  useEffect(() => {
+    const id = searchParams.get('id');
+    if (!id) return;
+    const skill = skills.find((s) => s.id === id);
+    if (skill) startEdit(skill);
+    else {
+      void api.skills.listPublic().then((pub) => {
+        const found = pub.find((s) => s.id === id);
+        if (found) setEditing(JSON.parse(JSON.stringify(found.data)));
+      });
+    }
+  }, [searchParams, skills]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startNew = () => {
     setEditing({

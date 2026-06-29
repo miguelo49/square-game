@@ -92,6 +92,30 @@ export function EnemyInspector({
           )}
 
           <label>
+            Velocidad
+            <input
+              type="number"
+              className="retro-input"
+              min={20}
+              max={200}
+              value={enemy.speed ?? 80}
+              onChange={(e) => patch({ speed: Number(e.target.value) })}
+            />
+          </label>
+
+          <label>
+            Dirección inicial
+            <select
+              className="retro-input"
+              value={String(enemy.direction ?? 1)}
+              onChange={(e) => patch({ direction: Number(e.target.value) as 1 | -1 })}
+            >
+              <option value="1">Derecha</option>
+              <option value="-1">Izquierda</option>
+            </select>
+          </label>
+
+          <label>
             Preset
             <select
               className="retro-input"
