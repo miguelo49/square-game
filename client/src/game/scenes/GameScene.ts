@@ -329,19 +329,6 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private refreshPlatformTiles(): void {
-    if (!this.platformTileRenderer || this.platformEntities.length === 0) return;
-    const containers = new Map(
-      this.platformEntities.map((e) => [e.id, e.visual])
-    );
-    this.platformTileRenderer.setAssets(this.assets);
-    this.platformTileRenderer.refreshAll(
-      this.level.platforms,
-      containers,
-      this.mode === 'edit'
-    );
-  }
-
   private buildLevel(): void {
     this.destroyPlatformEntities();
     this.platforms.clear(true, true);
@@ -363,8 +350,6 @@ export class GameScene extends Phaser.Scene {
     for (const p of this.level.platforms) {
       this.platformEntities.push(this.createPlatformEntity(p));
     }
-
-    this.refreshPlatformTiles();
 
     if (this.mode === 'play') {
       this.setupPlatformBehavior();

@@ -66,13 +66,17 @@ export function generateProceduralLevel(seed?: number): LevelSchema {
     { id: uuidv4(), x: 0, y: height - 64, w: width, h: 64, solid: true },
   ];
 
+  // Keep floating platforms in the lower ~55% of the level (avoid top-corner clutter)
+  const minPlatformY = Math.floor(height * 0.45);
+  const maxPlatformY = height - 128;
+
   let x = 128;
-  let y = height - 160;
+  let y = height - 192;
   while (x < width - 200 && platforms.length < MAX_PLATFORMS - 1) {
     const pw = 128 + Math.floor(rand() * 192);
     const gap = 64 + Math.floor(rand() * 128);
     const dy = (Math.floor(rand() * 3) - 1) * 64;
-    y = Math.max(200, Math.min(height - 128, y + dy));
+    y = Math.max(minPlatformY, Math.min(maxPlatformY, y + dy));
 
     platforms.push({
       id: uuidv4(),
@@ -81,10 +85,7 @@ export function generateProceduralLevel(seed?: number): LevelSchema {
       w: pw,
       h: 32,
       solid: true,
-      presetId:
-        platforms.length > 3 && rand() > 0.75
-          ? (['elevator', 'crumbling', 'conveyor'] as const)[Math.floor(rand() * 3)]
-          : 'static',
+      presetId: 'static',
     });
 
     x += pw + gap;

@@ -22,6 +22,18 @@ export class PlatformTileRenderer {
     this.assets = assets;
   }
 
+  /** Create tile image as container child only — never add to scene root first. */
+  private createTileImage(localX: number, localY: number, key: string): Phaser.GameObjects.Image {
+    const img = this.scene.make.image({
+      x: localX,
+      y: localY,
+      key,
+      add: false,
+    });
+    img.setDisplaySize(PLATFORM_TILE_SIZE, PLATFORM_TILE_SIZE);
+    return img;
+  }
+
   buildVisual(
     def: PlatformDef,
     allPlatforms: PlatformDef[],
@@ -36,9 +48,7 @@ export class PlatformTileRenderer {
 
     for (const cell of cells) {
       const key = autotileTextureKey(group, cell.variant);
-      const img = this.scene.add.image(cell.localX, cell.localY, key);
-      img.setDisplaySize(PLATFORM_TILE_SIZE, PLATFORM_TILE_SIZE);
-      parent.add(img);
+      parent.add(this.createTileImage(cell.localX, cell.localY, key));
     }
   }
 
@@ -65,9 +75,7 @@ export class PlatformTileRenderer {
       const cells = decomposePlatformTiles(def, occupancy);
       for (const cell of cells) {
         const key = autotileTextureKey(group, cell.variant);
-        const img = this.scene.add.image(cell.localX, cell.localY, key);
-        img.setDisplaySize(PLATFORM_TILE_SIZE, PLATFORM_TILE_SIZE);
-        container.add(img);
+        container.add(this.createTileImage(cell.localX, cell.localY, key));
       }
       for (const p of preserved) container.add(p);
     }

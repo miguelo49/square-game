@@ -23,6 +23,10 @@ export class SkillInterpreter {
   private baseScale = 1;
   private scaleTween?: Phaser.Tweens.Tween;
   private airJumpsUsed = 0;
+  /** True after a ground jump until the player lands again */
+  private groundJumpUsed = false;
+  private jumpBufferMs = 0;
+  private static readonly JUMP_BUFFER_MS = 140;
 
   constructor(
     scene: Phaser.Scene,
@@ -58,15 +62,18 @@ export class SkillInterpreter {
   }
 
   update(_time: number, delta: number): void {
-    if (this.onGroundFn()) {
-      this.airJumpsUsed = 0;
-    }
+    this.updateJumpState();
 
     for (const skillId of Object.keys(this.cooldowns)) {
       this.cooldowns[skillId] = Math.max(0, this.cooldowns[skillId] - delta);
     }
 
+    this.processJumpBuffer(delta);
+    this.processJumpKeys();
+
     for (const skill of this.skills) {
+      if (this.isJumpSkill(skill)) continue;
+
       const key = this.keys.get(skill.id);
       if (!key) continue;
 
@@ -84,14 +91,95 @@ export class SkillInterpreter {
     }
   }
 
+  private updateJumpState(): void {
+    const onGround = this.onGroundFn();
+    const vy = this.body.velocity.y;
+
+    if (onGround && vy >= -20) {
+      this.groundJumpUsed = false;
+      this.airJumpsUsed = 0;
+    }
+  }
+
+  private isJumpSkill(skill: SkillSchema): boolean {
+    return skill.actions.some((a) => a.type === 'jump' || (a.type === 'impulse' && a.axis === 'y'));
+  }
+
+  private isGroundJumpSkill(skill: SkillSchema): boolean {
+    return skill.conditions?.some((c) => c.type === 'onGround') ?? false;
+  }
+
+  private isAirJumpSkill(skill: SkillSchema): boolean {
+    return (
+      skill.conditions?.some((c) => c.type === 'airJumpAvailable' || c.type === 'inAir') ?? false
+    );
+  }
+
+  private canGroundJump(): boolean {
+    return this.onGroundFn();
+  }
+
+  private canAirJump(): boolean {
+    return this.groundJumpUsed && this.airJumpsUsed < 1;
+  }
+
+  private bufferJumpInput(): void {
+    this.jumpBufferMs = SkillInterpreter.JUMP_BUFFER_MS;
+  }
+
+  private processJumpBuffer(delta: number): void {
+    if (this.jumpBufferMs <= 0) return;
+    this.jumpBufferMs -= delta;
+    if (this.tryConsumeJump()) {
+      this.jumpBufferMs = 0;
+    }
+  }
+
+  private processJumpKeys(): void {
+    const jumpSkills = this.skills.filter((s) => this.isJumpSkill(s) && s.trigger.type === 'keydown');
+    const keysChecked = new Set<number>();
+
+    for (const skill of jumpSkills) {
+      const key = this.keys.get(skill.id);
+      if (!key) continue;
+      if (keysChecked.has(key.keyCode)) continue;
+
+      if (Phaser.Input.Keyboard.JustDown(key)) {
+        keysChecked.add(key.keyCode);
+        if (!this.tryConsumeJump()) {
+          this.bufferJumpInput();
+        }
+      }
+    }
+  }
+
+  /** Ground jump first, then air jump. Returns true if a jump was executed. */
+  private tryConsumeJump(): boolean {
+    const jumpSkills = this.skills.filter((s) => this.isJumpSkill(s));
+
+    const groundSkill = jumpSkills.find((s) => this.isGroundJumpSkill(s));
+    if (groundSkill && this.canGroundJump() && this.checkConditions(groundSkill)) {
+      this.executeActions(groundSkill);
+      return true;
+    }
+
+    const airSkill = jumpSkills.find((s) => this.isAirJumpSkill(s));
+    if (airSkill && this.canAirJump() && this.checkConditions(airSkill)) {
+      this.executeActions(airSkill);
+      return true;
+    }
+
+    return false;
+  }
+
   private checkConditions(skill: SkillSchema): boolean {
     if (!skill.conditions?.length) return true;
 
     for (const cond of skill.conditions) {
       if (cond.type === 'onGround' && !this.onGroundFn()) return false;
-      if (cond.type === 'inAir' && this.onGroundFn()) return false;
+      if (cond.type === 'inAir' && !this.canAirJump() && this.onGroundFn()) return false;
       if (cond.type === 'airJumpAvailable') {
-        if (this.onGroundFn() || this.airJumpsUsed >= 1) return false;
+        if (!this.canAirJump()) return false;
       }
       if (cond.type === 'cooldownReady' && (this.cooldowns[skill.id] ?? 0) > 0) {
         return false;
@@ -108,9 +196,13 @@ export class SkillInterpreter {
   }
 
   private usesAirJump(skill: SkillSchema): boolean {
-    return (
-      skill.conditions?.some((c) => c.type === 'inAir' || c.type === 'airJumpAvailable') ?? false
-    );
+    return this.isAirJumpSkill(skill);
+  }
+
+  private markGroundJump(skill: SkillSchema): void {
+    if (this.isGroundJumpSkill(skill)) {
+      this.groundJumpUsed = true;
+    }
   }
 
   private consumeAirJump(skill: SkillSchema): void {
@@ -126,6 +218,7 @@ export class SkillInterpreter {
           if (!skill.conditions?.some((c) => c.type === 'onGround') || this.onGroundFn()) {
             this.body.setVelocityY(-(action.force ?? 400));
           }
+          this.markGroundJump(skill);
           this.consumeAirJump(skill);
           this.triggerActionAnim(action, skill);
           break;
@@ -135,6 +228,7 @@ export class SkillInterpreter {
           } else {
             this.body.setVelocityY(-(action.force ?? 300));
           }
+          this.markGroundJump(skill);
           this.consumeAirJump(skill);
           this.triggerActionAnim(action, skill);
           break;

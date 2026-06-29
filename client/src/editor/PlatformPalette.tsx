@@ -29,7 +29,6 @@ export function PlatformPalette({
 }: PlatformPaletteProps) {
   return (
     <div className="platform-palette">
-      <h3>Herramientas</h3>
       {TOOLS.map((tool) => (
         <button
           key={tool.id}

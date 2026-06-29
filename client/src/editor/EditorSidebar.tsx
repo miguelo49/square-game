@@ -10,10 +10,15 @@ interface EditorSidebarProps {
   levelPanel: ReactNode;
 }
 
-const TABS: { id: EditorSidebarTab; label: string }[] = [
-  { id: 'tools', label: 'Herramientas' },
-  { id: 'inspector', label: 'Inspector' },
-  { id: 'level', label: 'Nivel' },
+const TABS: {
+  id: EditorSidebarTab;
+  label: string;
+  icon: string;
+  title: string;
+}[] = [
+  { id: 'tools', label: 'Herramientas', icon: '◈', title: 'Herramientas de edición' },
+  { id: 'inspector', label: 'Inspector', icon: '▣', title: 'Inspector de entidad' },
+  { id: 'level', label: 'Nivel', icon: '☰', title: 'Propiedades del nivel' },
 ];
 
 export function EditorSidebar({
@@ -35,10 +40,12 @@ export function EditorSidebar({
           <button
             key={t.id}
             type="button"
+            title={t.title}
             className={`retro-btn small editor-tab ${tab === t.id ? 'active' : ''}`}
             onClick={() => setTab(t.id)}
           >
-            {t.label}
+            <span className="editor-tab-icon">{t.icon}</span>
+            <span className="editor-tab-label">{t.label}</span>
             {t.id === 'inspector' && selectedEntityType && (
               <span className="tab-badge">{selectedEntityType === 'platform' ? '▬' : '△'}</span>
             )}
