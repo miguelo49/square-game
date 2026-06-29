@@ -7,7 +7,7 @@ export function createPhaserConfig(parent: HTMLElement): Phaser.Types.Core.GameC
     parent,
     pixelArt: true,
     roundPixels: true,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#0a1020',
     physics: {
       default: 'arcade',
       arcade: {

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GRID_SNAP } from '../../data/retroLimits';
+import { TRON_PLATFORM_COLORS } from '../utils/textures';
 
 const DEFAULT_W = 128;
 const DEFAULT_H = 32;
@@ -9,8 +10,8 @@ export class EditorGhost {
   private visible = false;
 
   constructor(scene: Phaser.Scene) {
-    this.rect = scene.add.rectangle(0, 0, DEFAULT_W, DEFAULT_H, 0x8b4513, 0.4);
-    this.rect.setStrokeStyle(2, 0x44ff44, 0.8);
+    this.rect = scene.add.rectangle(0, 0, DEFAULT_W, DEFAULT_H, TRON_PLATFORM_COLORS.base, 0.4);
+    this.rect.setStrokeStyle(2, TRON_PLATFORM_COLORS.neon, 0.8);
     this.rect.setDepth(500);
     this.rect.setScrollFactor(1);
     this.rect.setVisible(false);

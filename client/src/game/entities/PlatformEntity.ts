@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { AssetSchema, PlatformDef } from '../../types';
 import { PlatformTileRenderer } from '../systems/PlatformTileRenderer';
 import { platformHasMovement } from '../../data/platformPresets';
+import { TRON_PLATFORM_COLORS } from '../utils/textures';
 
 export class PlatformEntity {
   readonly def: PlatformDef;
@@ -50,8 +51,8 @@ export class PlatformEntity {
     tileRenderer.buildVisual(def, allPlatforms, this.visual);
 
     if (editMode) {
-      const hit = scene.add.rectangle(def.w / 2, def.h / 2, def.w, def.h, 0x8b4513, 0.25);
-      hit.setStrokeStyle(2, 0x228b22);
+      const hit = scene.add.rectangle(def.w / 2, def.h / 2, def.w, def.h, TRON_PLATFORM_COLORS.base, 0.25);
+      hit.setStrokeStyle(2, TRON_PLATFORM_COLORS.neon);
       this.visual.add(hit);
       hit.setInteractive({ draggable: true });
       hit.setData('type', 'platform');
@@ -125,10 +126,10 @@ export class PlatformEntity {
         this.def.h / 2,
         this.def.w,
         this.def.h,
-        0x8b4513,
+        TRON_PLATFORM_COLORS.base,
         0.25
       );
-      hit.setStrokeStyle(2, 0x228b22);
+      hit.setStrokeStyle(2, TRON_PLATFORM_COLORS.neon);
       this.visual.add(hit);
       hit.setInteractive({ draggable: true });
       hit.setData('type', 'platform');

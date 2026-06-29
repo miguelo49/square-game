@@ -12,6 +12,9 @@ import {
   PORTAL_H,
 } from '../game/utils/placement';
 
+/** Dark void background for default / procedural levels (Tron-style). */
+export const DEFAULT_LEVEL_BACKGROUND = '#0a1020';
+
 export function generateDemoLevel(): LevelSchema {
   return {
     version: 1,
@@ -19,7 +22,7 @@ export function generateDemoLevel(): LevelSchema {
     width: 3200,
     height: 960,
     spawn: { x: 128, y: entityCenterYOnSurface(896) },
-    backgroundColor: '#5c94fc',
+    backgroundColor: DEFAULT_LEVEL_BACKGROUND,
     platforms: [
       { id: 'p1', x: 0, y: 896, w: 3200, h: 64, solid: true },
       { id: 'p2', x: 256, y: 768, w: 256, h: 32, solid: true },
@@ -116,7 +119,7 @@ export function generateProceduralLevel(seed?: number): LevelSchema {
     height: Math.min(height, MAX_LEVEL_HEIGHT),
     spawn: { x: 128, y: entityCenterYOnSurface(ground.y) },
     portal: { x: portalPos.x, y: portalPos.y, w: 32, h: PORTAL_H },
-    backgroundColor: '#5c94fc',
+    backgroundColor: DEFAULT_LEVEL_BACKGROUND,
     platforms,
     enemies,
     skills: [

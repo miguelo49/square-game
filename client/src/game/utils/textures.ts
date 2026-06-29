@@ -11,6 +11,13 @@ import {
 } from './assetAnimations';
 import { autotileTextureKey, PLATFORM_TILE_SIZE } from './platformAutotile';
 
+/** Tron-style default platform palette (dark panel + cyan neon edge). */
+export const TRON_PLATFORM_COLORS = {
+  base: 0x0a1628,
+  neon: 0x00e5ff,
+  edge: 0x003344,
+} as const;
+
 const PLATFORM_TILE_VARIANTS: PlatformTileVariant[] = [
   'topLeft',
   'topMid',
@@ -206,11 +213,12 @@ export function createDefaultSquareTexture(scene: Phaser.Scene): void {
 
 export function createDefaultPlatformTexture(scene: Phaser.Scene): void {
   if (scene.textures.exists('platform-default')) return;
+  const { base, neon } = TRON_PLATFORM_COLORS;
   const g = scene.make.graphics({ x: 0, y: 0 });
-  g.fillStyle(0x8b4513);
+  g.fillStyle(base);
   g.fillRect(0, 0, 16, 16);
-  g.fillStyle(0x228b22);
-  g.fillRect(0, 0, 16, 4);
+  g.fillStyle(neon);
+  g.fillRect(0, 0, 16, 3);
   g.generateTexture('platform-default', 16, 16);
   g.destroy();
   createDefaultPlatformAutotileSet(scene, 'default');
@@ -221,12 +229,10 @@ function drawProceduralTile(
   variant: PlatformTileVariant,
   size: number
 ): void {
-  const dirt = 0x8b4513;
-  const grass = 0x228b22;
-  const dark = 0x6b3410;
+  const { base, neon, edge } = TRON_PLATFORM_COLORS;
 
   g.clear();
-  g.fillStyle(dirt);
+  g.fillStyle(base);
   g.fillRect(0, 0, size, size);
 
   const isTop = variant.startsWith('top');
@@ -235,22 +241,22 @@ function drawProceduralTile(
   const hasRightCap = variant.endsWith('Right') || variant.endsWith('Single');
 
   if (isTop) {
-    g.fillStyle(grass);
-    g.fillRect(0, 0, size, 4);
+    g.fillStyle(neon);
+    g.fillRect(0, 0, size, 3);
     if (hasLeftCap) g.fillRect(0, 0, 2, size);
     if (hasRightCap) g.fillRect(size - 2, 0, 2, size);
   } else if (isBottom) {
-    g.fillStyle(dark);
+    g.fillStyle(edge);
     g.fillRect(0, size - 3, size, 3);
     if (hasLeftCap) g.fillRect(0, 0, 2, size);
     if (hasRightCap) g.fillRect(size - 2, 0, 2, size);
   } else {
     if (hasLeftCap) {
-      g.fillStyle(dark);
+      g.fillStyle(edge);
       g.fillRect(0, 0, 2, size);
     }
     if (hasRightCap) {
-      g.fillStyle(dark);
+      g.fillStyle(edge);
       g.fillRect(size - 2, 0, 2, size);
     }
   }

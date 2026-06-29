@@ -391,7 +391,7 @@ export function seedDemoLevel(): void {
     width: 3200,
     height: 960,
     spawn: { x: 128, y: 880 },
-    backgroundColor: '#5c94fc',
+    backgroundColor: '#0a1020',
     platforms: [
       { id: 'p1', x: 0, y: 896, w: 3200, h: 64, solid: true },
       { id: 'p2', x: 256, y: 768, w: 256, h: 32, solid: true },

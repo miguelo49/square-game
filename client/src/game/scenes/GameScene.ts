@@ -73,6 +73,8 @@ export class GameScene extends Phaser.Scene {
   private runStartedAt = 0;
   private deathCount = 0;
   private defaultPlatformPreset = 'static';
+  private dragStartX = 0;
+  private dragStartY = 0;
 
   constructor() {
     super('GameScene');
@@ -446,6 +448,7 @@ export class GameScene extends Phaser.Scene {
     this.input.off('pointerdown');
     this.input.off('pointermove');
     this.input.off('dragstart');
+    this.input.off('dragstart');
     this.input.off('drag');
     this.input.off('dragend');
 
@@ -548,6 +551,11 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
+    this.input.on('dragstart', (pointer: Phaser.Input.Pointer) => {
+      this.dragStartX = pointer.x;
+      this.dragStartY = pointer.y;
+    });
+
     this.input.on('drag', (
       _pointer: Phaser.Input.Pointer,
       gameObject: Phaser.GameObjects.GameObject,
@@ -581,7 +589,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.input.on('dragend', (
-      _pointer: Phaser.Input.Pointer,
+      pointer: Phaser.Input.Pointer,
       gameObject: Phaser.GameObjects.GameObject
     ) => {
       const type = gameObject.getData('type') as string;
@@ -591,6 +599,10 @@ export class GameScene extends Phaser.Scene {
       let y = go.y;
 
       if (type === 'platform') {
+        const moved =
+          Math.hypot(pointer.x - this.dragStartX, pointer.y - this.dragStartY) > 4;
+        if (!moved) return;
+
         const entity = this.platformEntities.find((pe) => pe.id === id);
         const p = this.level.platforms.find((pl) => pl.id === id);
         if (entity && p) {
