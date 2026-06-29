@@ -1,0 +1,119 @@
+const BASE = '/api';
+
+async function request<T>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers ?? {}),
+    },
+    ...options,
+  });
+
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({ error: res.statusText }))) as {
+      error?: string;
+    };
+    throw new Error(err.error ?? `HTTP ${res.status}`);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+export const api = {
+  auth: {
+    register: (nickname: string, password: string) =>
+      request<{ id: string; nickname: string }>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ nickname, password }),
+      }),
+    login: (nickname: string, password: string) =>
+      request<{ id: string; nickname: string }>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ nickname, password }),
+      }),
+    logout: () => request<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
+    me: () => request<{ id: string; nickname: string }>('/auth/me'),
+  },
+  levels: {
+    list: () =>
+      request<
+        Array<{
+          id: string;
+          name: string;
+          data: import('../types').LevelSchema;
+          isDemo: boolean;
+          isPublic?: boolean;
+        }>
+      >('/levels'),
+    listPublic: () =>
+      request<
+        Array<{
+          id: string;
+          name: string;
+          data: import('../types').LevelSchema;
+          authorNickname: string;
+        }>
+      >('/levels/public'),
+    get: (id: string) =>
+      request<{
+        id: string;
+        name: string;
+        data: import('../types').LevelSchema;
+        isPublic?: boolean;
+      }>(`/levels/${id}`),
+    create: (name: string, data: import('../types').LevelSchema) =>
+      request<{ id: string }>('/levels', {
+        method: 'POST',
+        body: JSON.stringify({ name, data }),
+      }),
+    update: (id: string, name: string, data: import('../types').LevelSchema) =>
+      request<{ ok: boolean }>(`/levels/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name, data }),
+      }),
+    delete: (id: string) =>
+      request<{ ok: boolean }>(`/levels/${id}`, { method: 'DELETE' }),
+    share: (id: string) =>
+      request<{ isPublic: boolean }>(`/levels/${id}/share`, { method: 'POST' }),
+  },
+  assets: {
+    list: () =>
+      request<
+        Array<{ id: string; name: string; data: import('../types').AssetSchema }>
+      >('/assets'),
+    create: (name: string, data: import('../types').AssetSchema) =>
+      request<{ id: string }>('/assets', {
+        method: 'POST',
+        body: JSON.stringify({ name, data }),
+      }),
+    update: (id: string, name: string, data: import('../types').AssetSchema) =>
+      request<{ ok: boolean }>(`/assets/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name, data }),
+      }),
+    delete: (id: string) =>
+      request<{ ok: boolean }>(`/assets/${id}`, { method: 'DELETE' }),
+  },
+  skills: {
+    list: () =>
+      request<
+        Array<{ id: string; name: string; data: import('../types').SkillSchema }>
+      >('/skills'),
+    create: (name: string, data: import('../types').SkillSchema) =>
+      request<{ id: string }>('/skills', {
+        method: 'POST',
+        body: JSON.stringify({ name, data }),
+      }),
+    update: (id: string, data: import('../types').SkillSchema) =>
+      request<{ ok: boolean }>(`/skills/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ data }),
+      }),
+    delete: (id: string) =>
+      request<{ ok: boolean }>(`/skills/${id}`, { method: 'DELETE' }),
+  },
+};

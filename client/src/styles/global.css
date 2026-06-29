@@ -1,0 +1,701 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0f0f23;
+  --bg-panel: #1a1a3e;
+  --border: #4a4a8a;
+  --accent: #00d4ff;
+  --accent-dark: #0099cc;
+  --text: #e0e0ff;
+  --danger: #ff4444;
+  --success: #44ff88;
+  --font: 'Press Start 2P', monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 10px;
+  line-height: 1.6;
+  image-rendering: pixelated;
+}
+
+.page {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.loading {
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.logo {
+  font-size: 24px;
+  color: var(--accent);
+  text-shadow: 3px 3px 0 var(--accent-dark);
+  letter-spacing: 2px;
+}
+
+.tagline {
+  color: #8888cc;
+  margin: 12px 0 24px;
+  font-size: 8px;
+}
+
+.hint {
+  font-size: 7px;
+  color: #6666aa;
+  margin-top: 8px;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 8px;
+  margin: 8px 0;
+}
+
+.toast {
+  background: var(--bg-panel);
+  border: 2px solid var(--accent);
+  padding: 8px 16px;
+  margin: 8px 16px;
+  font-size: 8px;
+  color: var(--success);
+}
+
+.retro-btn {
+  font-family: var(--font);
+  font-size: 8px;
+  background: var(--bg-panel);
+  color: var(--text);
+  border: 3px solid var(--border);
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: all 0.1s;
+  text-transform: uppercase;
+}
+
+.retro-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.retro-btn.active,
+.retro-btn.primary {
+  background: var(--accent-dark);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.retro-btn.secondary {
+  background: transparent;
+  border-color: #666;
+}
+
+.retro-btn.small {
+  font-size: 7px;
+  padding: 6px 10px;
+}
+
+.retro-btn.danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.retro-input {
+  font-family: var(--font);
+  font-size: 8px;
+  background: var(--bg);
+  color: var(--text);
+  border: 2px solid var(--border);
+  padding: 8px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+label {
+  display: block;
+  font-size: 7px;
+  color: #aaa;
+  margin-bottom: 12px;
+}
+
+.auth-page {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #0f0f23 0%, #1a1a4e 100%);
+}
+
+.auth-box {
+  background: var(--bg-panel);
+  border: 4px solid var(--border);
+  padding: 32px;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.auth-tabs .tab {
+  flex: 1;
+}
+
+.auth-form {
+  text-align: left;
+}
+
+.auth-form .retro-btn {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.main-menu {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: linear-gradient(180deg, #0f0f23 0%, #2a1a4e 50%, #0f0f23 100%);
+}
+
+.welcome {
+  font-size: 10px;
+  color: var(--accent);
+}
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.menu-btn {
+  min-width: 280px;
+  font-size: 10px;
+  padding: 16px 24px;
+}
+
+.logout-btn {
+  margin-top: 32px;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: var(--bg-panel);
+  border-bottom: 3px solid var(--border);
+}
+
+.page-header h2 {
+  flex: 1;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.deaths {
+  font-size: 8px;
+  color: var(--danger);
+}
+
+.file-label {
+  cursor: pointer;
+}
+
+.play-layout,
+.editor-layout,
+.asset-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  height: calc(100vh - 60px);
+}
+
+.level-list {
+  width: 200px;
+  background: var(--bg-panel);
+  border-right: 3px solid var(--border);
+  padding: 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.level-item {
+  text-align: left;
+  width: 100%;
+}
+
+.level-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.level-tabs .retro-btn {
+  flex: 1;
+}
+
+.level-author {
+  font-size: 6px;
+  opacity: 0.75;
+}
+
+.empty-list {
+  font-size: 7px;
+  color: #888;
+  padding: 8px 4px;
+}
+
+.game-panel {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+}
+
+.game-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.game-canvas canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.editor-sidebar,
+.asset-sidebar {
+  width: 260px;
+  background: var(--bg-panel);
+  border-right: 3px solid var(--border);
+  padding: 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.editor-sidebar h3,
+.asset-sidebar h3 {
+  font-size: 8px;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.platform-palette {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.palette-btn {
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool-icon {
+  font-size: 12px;
+}
+
+.property-panel .stats {
+  font-size: 7px;
+  color: #888;
+  margin-top: 8px;
+}
+
+.property-panel .stats p {
+  margin: 4px 0;
+}
+
+.skill-builder {
+  border-top: 2px solid var(--border);
+  padding-top: 12px;
+}
+
+.skill-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.skill-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 7px;
+}
+
+.skill-item label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  flex: 1;
+}
+
+.skill-form {
+  background: var(--bg);
+  border: 2px solid var(--border);
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.music-panel {
+  border-top: 2px solid var(--border);
+  padding-top: 12px;
+  margin-top: 8px;
+}
+
+.music-panel h4 {
+  font-size: 8px;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.music-seed {
+  font-size: 7px;
+  color: #888;
+  margin: 0 0 8px;
+}
+
+.btn-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.editor-game {
+  min-height: 400px;
+}
+
+.pixel-panel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.pixel-editor {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.pixel-editor-info {
+  display: flex;
+  gap: 24px;
+  font-size: 7px;
+  color: #888;
+}
+
+.pixel-tools {
+  display: flex;
+  gap: 8px;
+}
+
+.pixel-canvas {
+  border: 4px solid var(--border);
+  cursor: crosshair;
+  image-rendering: pixelated;
+}
+
+.palette-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 32px);
+  gap: 4px;
+}
+
+.palette-swatch {
+  width: 32px;
+  height: 32px;
+  border: 2px solid #333;
+  cursor: pointer;
+  padding: 0;
+}
+
+.palette-swatch.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.palette-swatch.slot-active {
+  outline: 2px dashed #fff;
+  outline-offset: 1px;
+}
+
+.palette-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.palette-label {
+  font-size: 7px;
+  color: var(--accent);
+  margin: 0;
+}
+
+.subpalette-grid {
+  grid-template-columns: repeat(8, 28px);
+}
+
+.snes-master-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 20px);
+  gap: 2px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--bg);
+  border: 2px solid var(--border);
+}
+
+.snes-swatch {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #222;
+  cursor: pointer;
+  padding: 0;
+}
+
+.snes-swatch.assigned {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.game-canvas:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.asset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.asset-list-item {
+  display: flex;
+  gap: 4px;
+}
+
+.asset-list-item .retro-btn {
+  flex: 1;
+}
+
+.play-page,
+.editor-page,
+.asset-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.win-banner {
+  background: linear-gradient(90deg, #4a0080, #0099cc);
+  border-bottom: 3px solid var(--accent);
+  color: #fff;
+  font-size: 12px;
+  padding: 12px 16px;
+  text-align: center;
+  animation: pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes pulse {
+  from { opacity: 0.85; }
+  to { opacity: 1; }
+}
+
+.enemy-palette {
+  border-top: 2px solid var(--border);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.enemy-palette h4 {
+  font-size: 8px;
+  margin: 8px 0 4px;
+  color: var(--accent);
+}
+
+.enemy-asset-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.enemy-asset-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 8px;
+}
+
+.enemy-asset-btn.active {
+  border-color: var(--accent);
+  background: #1a2a3a;
+}
+
+.frame-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.onion-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 8px;
+}
+
+.fps-input {
+  width: 48px;
+  margin-left: 4px;
+}
+
+.music-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.music-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 2px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.music-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 8px;
+}
+
+.piano-roll {
+  display: flex;
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+  gap: 0;
+}
+
+.pitch-labels {
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+}
+
+.pitch-label {
+  font-size: 7px;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  padding-right: 4px;
+  box-sizing: border-box;
+}
+
+.voice-tracks {
+  flex: 1;
+  overflow-x: auto;
+}
+
+.voice-track {
+  margin-bottom: 12px;
+}
+
+.voice-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 8px;
+  margin-bottom: 4px;
+}
+
+.roll-grid {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  background: #0d0d18;
+  border: 2px solid var(--border);
+  cursor: crosshair;
+}
+
+.roll-cell {
+  box-sizing: border-box;
+  border-right: 1px solid #1a1a28;
+  border-bottom: 1px solid #1a1a28;
+}
+
+.roll-cell.beat {
+  border-left: 1px solid #333;
+}
+
+.roll-cell.octave {
+  background: #12121f;
+}
+
+.roll-note {
+  position: absolute;
+  background: var(--accent);
+  border-radius: 2px;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.music-page {
+  height: 100vh;
+}

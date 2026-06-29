@@ -1,0 +1,83 @@
+import Phaser from 'phaser';
+import type { EnemyDef } from '../../types';
+
+export class TriangleEnemy extends Phaser.Physics.Arcade.Sprite {
+  private behavior: EnemyDef['behavior'];
+  private patrolRange: number;
+  private startX: number;
+  private direction = 1;
+  private chaseRange = 320;
+  private hopTimer = 0;
+  private hopInterval = 1200;
+
+  constructor(scene: Phaser.Scene, def: EnemyDef) {
+    const baseKey = def.assetId ? `asset-${def.assetId}` : 'enemy-default';
+    const sheetKey = def.assetId ? `asset-${def.assetId}-sheet` : null;
+    const tex =
+      sheetKey && scene.textures.exists(sheetKey) ? sheetKey : baseKey;
+    super(scene, def.x, def.y, tex);
+    scene.add.existing(this);
+    scene.physics.add.existing(this);
+
+    this.setDisplaySize(32, 32);
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    body.setSize(28, 28);
+    body.setOffset(2, 2);
+    body.setAllowGravity(true);
+    body.setGravityY(900);
+    body.setImmovable(false);
+    body.setCollideWorldBounds(false);
+
+    this.behavior = def.behavior;
+    this.patrolRange = def.patrolRange ?? 128;
+    this.startX = def.x;
+
+    const animKey = def.assetId ? `asset-${def.assetId}-anim` : null;
+    if (animKey && scene.anims.exists(animKey)) {
+      this.play(animKey);
+    }
+  }
+
+  update(player?: Phaser.Physics.Arcade.Sprite, delta = 16): void {
+    switch (this.behavior) {
+      case 'patrol':
+        this.patrol();
+        break;
+      case 'chase':
+        if (player) this.chase(player);
+        else this.patrol();
+        break;
+      case 'stationary':
+        this.setVelocityX(0);
+        break;
+      case 'hopper':
+        this.hopTimer += delta;
+        if (this.hopTimer >= this.hopInterval && this.body?.blocked.down) {
+          this.setVelocityY(-280);
+          this.hopTimer = 0;
+        }
+        this.patrol();
+        break;
+    }
+  }
+
+  private patrol(): void {
+    const dist = this.x - this.startX;
+    if (dist > this.patrolRange) this.direction = -1;
+    if (dist < -this.patrolRange) this.direction = 1;
+    const speed = this.behavior === 'hopper' ? 60 : 80;
+    this.setVelocityX(this.direction * speed);
+    this.setFlipX(this.direction < 0);
+  }
+
+  private chase(player: Phaser.Physics.Arcade.Sprite): void {
+    const dx = player.x - this.x;
+    if (Math.abs(dx) > this.chaseRange) {
+      this.patrol();
+      return;
+    }
+    this.direction = dx > 0 ? 1 : -1;
+    this.setVelocityX(this.direction * 140);
+    this.setFlipX(this.direction < 0);
+  }
+}
