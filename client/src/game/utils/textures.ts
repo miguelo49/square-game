@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { AssetSchema, AssetAnimClip } from '../../types';
+import type { AssetSchema, AssetAnimClip, PlatformTileVariant } from '../../types';
 import { ASSET_ANIM_CLIPS } from '../../types';
 import { paletteColor } from '../../data/snesPalette';
 import {
@@ -9,6 +9,22 @@ import {
   getClipFrames,
   getPrimaryClip,
 } from './assetAnimations';
+import { autotileTextureKey, PLATFORM_TILE_SIZE } from './platformAutotile';
+
+const PLATFORM_TILE_VARIANTS: PlatformTileVariant[] = [
+  'topLeft',
+  'topMid',
+  'topRight',
+  'topSingle',
+  'fillLeft',
+  'fillMid',
+  'fillRight',
+  'fillSingle',
+  'bottomLeft',
+  'bottomMid',
+  'bottomRight',
+  'bottomSingle',
+];
 
 export function getAssetFrames(asset: AssetSchema): number[][] {
   const idle = getClipFrames(asset, 'idle');
@@ -197,6 +213,128 @@ export function createDefaultPlatformTexture(scene: Phaser.Scene): void {
   g.fillRect(0, 0, 16, 4);
   g.generateTexture('platform-default', 16, 16);
   g.destroy();
+  createDefaultPlatformAutotileSet(scene, 'default');
+}
+
+function drawProceduralTile(
+  g: Phaser.GameObjects.Graphics,
+  variant: PlatformTileVariant,
+  size: number
+): void {
+  const dirt = 0x8b4513;
+  const grass = 0x228b22;
+  const dark = 0x6b3410;
+
+  g.clear();
+  g.fillStyle(dirt);
+  g.fillRect(0, 0, size, size);
+
+  const isTop = variant.startsWith('top');
+  const isBottom = variant.startsWith('bottom');
+  const hasLeftCap = variant.endsWith('Left') || variant.endsWith('Single');
+  const hasRightCap = variant.endsWith('Right') || variant.endsWith('Single');
+
+  if (isTop) {
+    g.fillStyle(grass);
+    g.fillRect(0, 0, size, 4);
+    if (hasLeftCap) g.fillRect(0, 0, 2, size);
+    if (hasRightCap) g.fillRect(size - 2, 0, 2, size);
+  } else if (isBottom) {
+    g.fillStyle(dark);
+    g.fillRect(0, size - 3, size, 3);
+    if (hasLeftCap) g.fillRect(0, 0, 2, size);
+    if (hasRightCap) g.fillRect(size - 2, 0, 2, size);
+  } else {
+    if (hasLeftCap) {
+      g.fillStyle(dark);
+      g.fillRect(0, 0, 2, size);
+    }
+    if (hasRightCap) {
+      g.fillStyle(dark);
+      g.fillRect(size - 2, 0, 2, size);
+    }
+  }
+}
+
+export function createDefaultPlatformAutotileSet(
+  scene: Phaser.Scene,
+  group = 'default',
+  size = PLATFORM_TILE_SIZE
+): void {
+  for (const variant of PLATFORM_TILE_VARIANTS) {
+    const key = autotileTextureKey(group, variant);
+    if (scene.textures.exists(key)) continue;
+    const g = scene.make.graphics({ x: 0, y: 0 });
+    drawProceduralTile(g, variant, size);
+    g.generateTexture(key, size, size);
+    g.destroy();
+  }
+}
+
+function deriveTileFromAssetPixels(
+  asset: AssetSchema,
+  variant: PlatformTileVariant
+): number[] {
+  const explicit = asset.platformTiles?.[variant];
+  if (explicit?.length) return explicit;
+
+  const w = asset.width;
+  const h = asset.height;
+  const base = asset.pixels;
+  const out = new Array(w * h).fill(0);
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let sx = x;
+      let sy = y;
+      if (variant.startsWith('top') && y < 4) sy = y;
+      else if (variant.startsWith('bottom') && y >= h - 3) sy = h - 3 + (y - (h - 3));
+      else if (variant.startsWith('fill')) sy = Math.min(y, 4);
+
+      if (variant.endsWith('Left') || variant.endsWith('Single')) sx = Math.min(x, 2);
+      else if (variant.endsWith('Right')) sx = w - 3 + Math.min(x, 2);
+      else sx = Math.min(x, w - 1);
+
+      out[y * w + x] = base[sy * w + sx] ?? 0;
+    }
+  }
+  return out;
+}
+
+export function registerPlatformAutotileSet(
+  scene: Phaser.Scene,
+  asset: AssetSchema
+): void {
+  if (asset.category !== 'platform') return;
+  const group = asset.id;
+  const size = asset.width;
+
+  for (const variant of PLATFORM_TILE_VARIANTS) {
+    const key = autotileTextureKey(group, variant);
+    if (scene.textures.exists(key)) continue;
+
+    const pixels = deriveTileFromAssetPixels(asset, variant);
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+    drawFrameToCanvas(ctx, pixels, size, size, asset.paletteSlots);
+    scene.textures.addCanvas(key, canvas);
+  }
+}
+
+export function ensurePlatformTileTextures(
+  scene: Phaser.Scene,
+  group: string,
+  assets: AssetSchema[]
+): void {
+  if (group === 'default') {
+    createDefaultPlatformAutotileSet(scene, 'default');
+    return;
+  }
+  const asset = assets.find((a) => a.id === group);
+  if (asset) registerPlatformAutotileSet(scene, asset);
+  else createDefaultPlatformAutotileSet(scene, group);
 }
 
 export function createDefaultEnemyTexture(scene: Phaser.Scene): void {

@@ -30,6 +30,63 @@ export interface AssetClipDef {
   loop?: boolean;
 }
 
+export type PlatformTriggerType =
+  | 'always'
+  | 'onTouch'
+  | 'onLeave'
+  | 'afterTouch'
+  | 'offScreen'
+  | 'interval';
+
+export type PlatformActionType =
+  | 'move'
+  | 'path'
+  | 'fade'
+  | 'spawn'
+  | 'setSolid'
+  | 'destroy'
+  | 'custom';
+
+export type PlatformTileVariant =
+  | 'topLeft'
+  | 'topMid'
+  | 'topRight'
+  | 'topSingle'
+  | 'fillLeft'
+  | 'fillMid'
+  | 'fillRight'
+  | 'fillSingle'
+  | 'bottomLeft'
+  | 'bottomMid'
+  | 'bottomRight'
+  | 'bottomSingle';
+
+export interface PlatformAction {
+  type: PlatformActionType;
+  axis?: 'x' | 'y';
+  speed?: number;
+  distance?: number;
+  pingPong?: boolean;
+  duration?: number;
+  destroyAfter?: boolean;
+  solid?: boolean;
+  offsetX?: number;
+  offsetY?: number;
+  script?: string;
+  waypoints?: { x: number; y: number }[];
+}
+
+export interface PlatformRule {
+  id: string;
+  trigger: PlatformTriggerType;
+  delay?: number;
+  interval?: number;
+  offScreenMargin?: number;
+  actions: PlatformAction[];
+  loop?: boolean;
+  once?: boolean;
+}
+
 export interface PlatformDef {
   id: string;
   x: number;
@@ -38,6 +95,19 @@ export interface PlatformDef {
   h: number;
   solid: boolean;
   assetId?: string;
+  rules?: PlatformRule[];
+  presetId?: string;
+  /** Runtime-only clones; excluded from save */
+  runtimeOnly?: boolean;
+}
+
+export interface PlatformPresetParams {
+  speed?: number;
+  distance?: number;
+  delay?: number;
+  interval?: number;
+  offScreenMargin?: number;
+  offsetY?: number;
 }
 
 export interface EnemyDef {
@@ -137,6 +207,8 @@ export interface AssetSchema {
   pixels: number[];
   paletteSlots: number[];
   name?: string;
+  /** Explicit autotile variants for platform assets */
+  platformTiles?: Partial<Record<PlatformTileVariant, number[]>>;
   /** @deprecated use animations.idle */
   frames?: number[][];
   /** @deprecated use animations.idle.fps */
@@ -163,7 +235,7 @@ export interface EditorTool {
 }
 
 export interface EditorSelection {
-  type: 'enemy';
+  type: 'enemy' | 'platform';
   id: string;
 }
 

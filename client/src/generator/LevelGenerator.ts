@@ -80,6 +80,10 @@ export function generateProceduralLevel(seed?: number): LevelSchema {
       w: pw,
       h: 32,
       solid: true,
+      presetId:
+        platforms.length > 3 && rand() > 0.75
+          ? (['elevator', 'crumbling', 'conveyor'] as const)[Math.floor(rand() * 3)]
+          : 'static',
     });
 
     x += pw + gap;
@@ -128,5 +132,10 @@ export function validateLevel(level: LevelSchema): string | null {
   if (level.height > MAX_LEVEL_HEIGHT) return `Alto máximo ${MAX_LEVEL_HEIGHT}px`;
   if (level.platforms.length > MAX_PLATFORMS) return `Máximo ${MAX_PLATFORMS} plataformas`;
   if (level.enemies.length > MAX_ENEMIES) return `Máximo ${MAX_ENEMIES} enemigos`;
+  for (const p of level.platforms) {
+    if ((p.rules?.length ?? 0) > 5) {
+      return `Plataforma ${p.id}: máximo 5 reglas`;
+    }
+  }
   return null;
 }

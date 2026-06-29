@@ -1,5 +1,6 @@
 import type { PlatformDef } from '../../types';
 import { GRID_SNAP } from '../../data/retroLimits';
+import { expandPlatformPreset } from '../../data/platformPresets';
 
 export const ENTITY_H = 32;
 export const PORTAL_H = 48;
@@ -68,11 +69,20 @@ export function portalCenterOnPlatform(
   };
 }
 
+export function migratePlatformDef(p: PlatformDef): PlatformDef {
+  const expanded = expandPlatformPreset(p);
+  const { runtimeOnly: _, ...rest } = expanded;
+  return rest;
+}
+
 export function migrateLevel<T extends { portal?: { x: number; y: number; w: number; h: number }; width: number; height: number; platforms: PlatformDef[] }>(
   level: T
 ): T & { portal: { x: number; y: number; w: number; h: number } } {
+  const migratedPlatforms = level.platforms
+    .filter((p) => !p.runtimeOnly)
+    .map(migratePlatformDef);
   if (level.portal) {
-    return level as T & { portal: { x: number; y: number; w: number; h: number } };
+    return { ...level, platforms: migratedPlatforms } as T & { portal: { x: number; y: number; w: number; h: number } };
   }
 
   const ground = level.platforms[0];
@@ -81,6 +91,7 @@ export function migrateLevel<T extends { portal?: { x: number; y: number; w: num
 
   return {
     ...level,
+    platforms: migratedPlatforms,
     portal: {
       x: portalX,
       y: entityCenterYOnSurface(surfaceY, PORTAL_H),

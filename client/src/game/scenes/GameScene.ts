@@ -1,10 +1,13 @@
 import Phaser from 'phaser';
-import type { LevelSchema, SkillSchema, AssetSchema, GameMode, SelectedEnemyConfig, RunResult } from '../../types';
+import type { LevelSchema, SkillSchema, AssetSchema, GameMode, SelectedEnemyConfig, RunResult, PlatformDef } from '../../types';
 import { CameraController } from '../systems/CameraController';
 import { EditorGrid } from '../systems/EditorGrid';
 import { EditorGhost } from '../systems/EditorGhost';
 import { SkillInterpreter } from '../systems/SkillInterpreter';
 import { TriangleEnemy } from '../entities/TriangleEnemy';
+import { PlatformEntity } from '../entities/PlatformEntity';
+import { PlatformTileRenderer } from '../systems/PlatformTileRenderer';
+import { PlatformBehaviorRunner } from '../systems/PlatformBehaviorRunner';
 import { createEnemy, presetToEnemyDef, DEFAULT_ENEMY_SELECTION } from '../entities/enemyRegistry';
 import {
   createDefaultSquareTexture,
@@ -14,11 +17,14 @@ import {
   createPortalTexture,
   createProjectileTexture,
   registerAssetClips,
+  registerPlatformAutotileSet,
   assetTextureKey,
 } from '../utils/textures';
 import { initSpriteAnimation, AnimationController } from '../systems/AnimationController';
 import { ProjectileManager } from '../systems/ProjectileManager';
 import { migrateLevel, snapToPlatformSurface, PORTAL_H } from '../utils/placement';
+import { snapPlatformAdjacent } from '../utils/platformSnap';
+import { stripRuntimePlatforms } from '../systems/PlatformScriptRunner';
 import { GAME_CAPTURE_KEYS } from '../utils/phaserKeys';
 import { GRID_SNAP } from '../../data/retroLimits';
 
@@ -28,12 +34,10 @@ export interface GameSceneCallbacks {
   onEditorSelect?: (type: string, id: string) => void;
 }
 
-type DraggableObject =
-  | Phaser.GameObjects.Rectangle
-  | Phaser.GameObjects.Image
-  | TriangleEnemy;
+type DraggableObject = Phaser.GameObjects.Rectangle | Phaser.GameObjects.Image | TriangleEnemy;
 
 type HitEntity = { type: 'enemy' | 'platform'; id: string };
+type SelectedEntityType = 'enemy' | 'platform' | '';
 
 export class GameScene extends Phaser.Scene {
   private level!: LevelSchema;
@@ -42,6 +46,9 @@ export class GameScene extends Phaser.Scene {
   private mode: GameMode = 'play';
   private player!: Phaser.Physics.Arcade.Sprite;
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
+  private platformEntities: PlatformEntity[] = [];
+  private platformTileRenderer?: PlatformTileRenderer;
+  private platformBehaviorRunner?: PlatformBehaviorRunner;
   private enemyGroup?: Phaser.Physics.Arcade.Group;
   private enemies: TriangleEnemy[] = [];
   private editorEnemySprites: Phaser.GameObjects.Image[] = [];
@@ -56,7 +63,6 @@ export class GameScene extends Phaser.Scene {
   private callbacks: GameSceneCallbacks = {};
   private editorTool: string = 'select';
   private selectedEnemy: SelectedEnemyConfig = DEFAULT_ENEMY_SELECTION;
-  private platformSprites: Map<string, Phaser.GameObjects.Rectangle> = new Map();
   private deleteHighlight?: Phaser.GameObjects.Rectangle;
   private selectionHighlight?: Phaser.GameObjects.Rectangle;
   private selectedEntityId: string | null = null;
@@ -116,7 +122,12 @@ export class GameScene extends Phaser.Scene {
 
     for (const asset of this.assets) {
       registerAssetClips(this, asset);
+      if (asset.category === 'platform') {
+        registerPlatformAutotileSet(this, asset);
+      }
     }
+
+    this.platformTileRenderer = new PlatformTileRenderer(this, this.assets);
 
     this.physics.world.setBounds(0, 0, this.level.width, this.level.height);
     this.cameras.main.setBackgroundColor(this.level.backgroundColor);
@@ -208,14 +219,27 @@ export class GameScene extends Phaser.Scene {
       this.selectionHighlight.setVisible(false);
       return;
     }
-    const e = this.level.enemies.find((en) => en.id === this.selectedEntityId);
-    if (!e) {
-      this.selectionHighlight.setVisible(false);
+    const enemy = this.level.enemies.find((en) => en.id === this.selectedEntityId);
+    if (enemy) {
+      this.selectionHighlight.setPosition(enemy.x, enemy.y);
+      this.selectionHighlight.setSize(32, 32);
+      this.selectionHighlight.setVisible(true);
       return;
     }
-    this.selectionHighlight.setPosition(e.x, e.y);
-    this.selectionHighlight.setSize(32, 32);
-    this.selectionHighlight.setVisible(true);
+    const platform = this.level.platforms.find((pl) => pl.id === this.selectedEntityId);
+    if (platform) {
+      this.selectionHighlight.setPosition(platform.x + platform.w / 2, platform.y + platform.h / 2);
+      this.selectionHighlight.setSize(platform.w, platform.h);
+      this.selectionHighlight.setVisible(true);
+      return;
+    }
+    this.selectionHighlight.setVisible(false);
+  }
+
+  private selectEntity(type: SelectedEntityType, id: string | null): void {
+    this.selectedEntityId = id;
+    this.updateSelectionHighlight();
+    this.callbacks.onEditorSelect?.(type, id ?? '');
   }
 
   private enemyTexture(def: { assetId?: string }): string {
@@ -262,9 +286,47 @@ export class GameScene extends Phaser.Scene {
     return false;
   }
 
+  private destroyPlatformEntities(): void {
+    for (const e of this.platformEntities) {
+      e.destroy();
+    }
+    this.platformEntities = [];
+  }
+
+  private createPlatformEntity(def: PlatformDef): PlatformEntity {
+    const renderer = this.platformTileRenderer!;
+    return new PlatformEntity(
+      this,
+      def,
+      this.assets,
+      renderer,
+      this.level.platforms,
+      this.platforms,
+      this.mode === 'edit'
+    );
+  }
+
+  private setupPlatformBehavior(): void {
+    this.platformBehaviorRunner = new PlatformBehaviorRunner();
+    this.platformBehaviorRunner.setEntities(this.platformEntities);
+    this.platformBehaviorRunner.setSpawnCallback((def) => {
+      const entity = this.createPlatformEntity(def);
+      this.platformEntities.push(entity);
+      this.platformBehaviorRunner!.addEntity(entity);
+      if (this.enemyGroup) {
+        this.physics.add.collider(this.enemyGroup, entity.bodySprite);
+      }
+      return entity;
+    });
+    this.platformBehaviorRunner.setDestroyCallback((entity) => {
+      entity.destroy();
+      this.platformEntities = this.platformEntities.filter((e) => e !== entity);
+      this.platformBehaviorRunner?.removeEntity(entity);
+    });
+  }
+
   private buildLevel(): void {
-    this.platformSprites.forEach((s) => s.destroy());
-    this.platformSprites.clear();
+    this.destroyPlatformEntities();
     this.platforms.clear(true, true);
     this.enemies.forEach((e) => e.destroy());
     this.enemies = [];
@@ -282,29 +344,11 @@ export class GameScene extends Phaser.Scene {
     }
 
     for (const p of this.level.platforms) {
-      const plat = this.platforms.create(
-        p.x + p.w / 2,
-        p.y + p.h / 2,
-        'platform-default'
-      );
-      plat.setDisplaySize(p.w, p.h);
-      plat.refreshBody();
+      this.platformEntities.push(this.createPlatformEntity(p));
+    }
 
-      if (this.mode === 'edit') {
-        const rect = this.add.rectangle(
-          p.x + p.w / 2,
-          p.y + p.h / 2,
-          p.w,
-          p.h,
-          0x8b4513,
-          0.6
-        );
-        rect.setStrokeStyle(2, 0x228b22);
-        rect.setInteractive({ draggable: true });
-        rect.setData('type', 'platform');
-        rect.setData('id', p.id);
-        this.platformSprites.set(p.id, rect);
-      }
+    if (this.mode === 'play') {
+      this.setupPlatformBehavior();
     }
 
     for (const e of this.level.enemies) {
@@ -451,13 +495,11 @@ export class GameScene extends Phaser.Scene {
       if (this.editorTool === 'select') {
         const hit = this.findEntityAt(world.x, world.y);
         if (hit?.type === 'enemy') {
-          this.selectedEntityId = hit.id;
-          this.updateSelectionHighlight();
-          this.callbacks.onEditorSelect?.('enemy', hit.id);
+          this.selectEntity('enemy', hit.id);
+        } else if (hit?.type === 'platform') {
+          this.selectEntity('platform', hit.id);
         } else {
-          this.selectedEntityId = null;
-          this.updateSelectionHighlight();
-          this.callbacks.onEditorSelect?.('', '');
+          this.selectEntity('', null);
         }
         return;
       }
@@ -467,7 +509,11 @@ export class GameScene extends Phaser.Scene {
 
       if (this.editorTool === 'platform') {
         const id = `p-${Date.now()}`;
-        this.level.platforms.push({ id, x, y, w: 128, h: 32, solid: true });
+        const newPlat: PlatformDef = { id, x, y, w: 128, h: 32, solid: true };
+        const snapped = snapPlatformAdjacent(newPlat, this.level.platforms);
+        newPlat.x = snapped.x;
+        newPlat.y = snapped.y;
+        this.level.platforms.push(newPlat);
         this.rebuildAndEmit();
       } else if (this.editorTool === 'enemy') {
         const id = `e-${Date.now()}`;
@@ -495,9 +541,30 @@ export class GameScene extends Phaser.Scene {
       dragX: number,
       dragY: number
     ) => {
-      const go = gameObject as unknown as DraggableObject;
-      go.x = Math.round(dragX / GRID_SNAP) * GRID_SNAP;
-      go.y = Math.round(dragY / GRID_SNAP) * GRID_SNAP;
+      const type = gameObject.getData('type') as string;
+      const id = gameObject.getData('id') as string;
+      const snapX = Math.round(dragX / GRID_SNAP) * GRID_SNAP;
+      const snapY = Math.round(dragY / GRID_SNAP) * GRID_SNAP;
+
+      if (type === 'platform') {
+        const entity = this.platformEntities.find((pe) => pe.id === id);
+        const p = this.level.platforms.find((pl) => pl.id === id);
+        if (entity && p) {
+          let nx = snapX - p.w / 2;
+          let ny = snapY - p.h / 2;
+          const snapped = snapPlatformAdjacent({ ...p, x: nx, y: ny }, this.level.platforms);
+          nx = snapped.x;
+          ny = snapped.y;
+          entity.setPosition(nx, ny);
+          (gameObject as Phaser.GameObjects.Rectangle).x = p.w / 2;
+          (gameObject as Phaser.GameObjects.Rectangle).y = p.h / 2;
+        }
+        return;
+      }
+
+      const go = gameObject as DraggableObject;
+      go.x = snapX;
+      go.y = snapY;
     });
 
     this.input.on('dragend', (
@@ -506,7 +573,7 @@ export class GameScene extends Phaser.Scene {
     ) => {
       const type = gameObject.getData('type') as string;
       const id = gameObject.getData('id') as string;
-      const go = gameObject as unknown as DraggableObject;
+      const go = gameObject as DraggableObject;
       let x = go.x;
       let y = go.y;
 
@@ -515,6 +582,9 @@ export class GameScene extends Phaser.Scene {
         if (p) {
           p.x = x - p.w / 2;
           p.y = y - p.h / 2;
+          const snapped = snapPlatformAdjacent(p, this.level.platforms);
+          p.x = snapped.x;
+          p.y = snapped.y;
         }
       } else if (type === 'enemy') {
         const snapped = snapToPlatformSurface(x, y, this.level.platforms);
@@ -537,7 +607,9 @@ export class GameScene extends Phaser.Scene {
     });
 
     const draggables = [
-      ...this.platformSprites.values(),
+      ...this.platformEntities
+        .map((pe) => pe.getDraggable())
+        .filter(Boolean),
       ...this.editorEnemySprites,
       this.spawnMarker,
       this.portalMarker,
@@ -547,6 +619,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private rebuildAndEmit(): void {
+    this.level.platforms = stripRuntimePlatforms(this.level);
     this.buildLevel();
     if (this.mode === 'edit') {
       this.setupEditorInput();
@@ -591,6 +664,7 @@ export class GameScene extends Phaser.Scene {
       this.skillInterpreter.applyFriction();
       this.playerAnimCtrl?.update(_time);
       this.projectileManager?.update(delta);
+      this.platformBehaviorRunner?.update(delta, this.player, this.cameras.main);
       for (const enemy of this.enemies) {
         enemy.update(this.player, delta, _time);
       }
@@ -614,6 +688,7 @@ export class GameScene extends Phaser.Scene {
 
   shutdown(): void {
     this.events.off('update-level', this.handleLevelUpdate, this);
+    this.destroyPlatformEntities();
     this.editorGrid?.destroy();
     this.editorGhost?.destroy();
     this.deleteHighlight?.destroy();

@@ -7,6 +7,7 @@ import { GameCanvas } from '../game/GameCanvas';
 import { PlatformPalette } from '../editor/PlatformPalette';
 import { EnemyPalette } from '../editor/EnemyPalette';
 import { EnemyInspector } from '../editor/EnemyInspector';
+import { PlatformInspector } from '../editor/PlatformInspector';
 import { PropertyPanel } from '../editor/PropertyPanel';
 import { SkillBuilder } from '../editor/SkillBuilder';
 import { generateProceduralLevel, validateLevel } from '../generator/LevelGenerator';
@@ -24,6 +25,7 @@ export function LevelEditor() {
   const [editorTool, setEditorTool] = useState('platform');
   const [selectedEnemy, setSelectedEnemy] = useState<SelectedEnemyConfig>(DEFAULT_ENEMY_SELECTION);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  const [selectedEntityType, setSelectedEntityType] = useState<'enemy' | 'platform' | ''>('');
   const [mode, setMode] = useState<'edit' | 'play'>('edit');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -172,18 +174,43 @@ export function LevelEditor() {
             selected={selectedEnemy}
             onChange={setSelectedEnemy}
           />
+          <PlatformInspector
+            platforms={level.platforms}
+            selectedId={selectedEntityType === 'platform' ? selectedEntityId : null}
+            assets={assets}
+            onSelect={(id) => {
+              setSelectedEntityType('platform');
+              setSelectedEntityId(id);
+            }}
+            onChange={(platform) => {
+              setLevel({
+                ...level,
+                platforms: level.platforms.map((p) => (p.id === platform.id ? platform : p)),
+              });
+            }}
+            onClear={() => {
+              setSelectedEntityId(null);
+              setSelectedEntityType('');
+            }}
+          />
           <EnemyInspector
             enemies={level.enemies}
-            selectedId={selectedEntityId}
+            selectedId={selectedEntityType === 'enemy' ? selectedEntityId : null}
             assets={assets}
-            onSelect={setSelectedEntityId}
+            onSelect={(id) => {
+              setSelectedEntityType('enemy');
+              setSelectedEntityId(id);
+            }}
             onChange={(enemy) => {
               setLevel({
                 ...level,
                 enemies: level.enemies.map((e) => (e.id === enemy.id ? enemy : e)),
               });
             }}
-            onClear={() => setSelectedEntityId(null)}
+            onClear={() => {
+              setSelectedEntityId(null);
+              setSelectedEntityType('');
+            }}
           />
           <PropertyPanel
             level={level}
@@ -215,8 +242,16 @@ export function LevelEditor() {
             selectedEntityId={selectedEntityId}
             onLevelChange={handleLevelChange}
             onEditorSelect={(type, id) => {
-              if (type === 'enemy' && id) setSelectedEntityId(id);
-              else if (!type) setSelectedEntityId(null);
+              if (type === 'enemy' && id) {
+                setSelectedEntityType('enemy');
+                setSelectedEntityId(id);
+              } else if (type === 'platform' && id) {
+                setSelectedEntityType('platform');
+                setSelectedEntityId(id);
+              } else if (!type) {
+                setSelectedEntityId(null);
+                setSelectedEntityType('');
+              }
             }}
             onDeath={() => setMode('edit')}
             onWin={() => setCompleted(true)}
