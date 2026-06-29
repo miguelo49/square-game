@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../api/client';
-import type { LevelSchema, SkillSchema, AssetSchema, SelectedEnemyConfig } from '../types';
+import type { LevelSchema, SelectedEnemyConfig } from '../types';
 import { DEFAULT_ENEMY_SELECTION } from '../game/entities/enemyRegistry';
 import { GameCanvas } from '../game/GameCanvas';
 import { PlatformPalette } from '../editor/PlatformPalette';
@@ -12,6 +12,7 @@ import { SkillBuilder } from '../editor/SkillBuilder';
 import { generateProceduralLevel, validateLevel } from '../generator/LevelGenerator';
 import { downloadSqlevel, importSqlevel } from '../storage/compression';
 import { migrateLevel } from '../game/utils/placement';
+import { useGameContent } from '../hooks/useGameContent';
 
 export function LevelEditor() {
   const navigate = useNavigate();
@@ -20,8 +21,6 @@ export function LevelEditor() {
   const [levelName, setLevelName] = useState('Mi Nivel');
   const [levelId, setLevelId] = useState<string | null>(null);
   const [isPublic, setIsPublic] = useState(false);
-  const [skills, setSkills] = useState<SkillSchema[]>([]);
-  const [assets, setAssets] = useState<AssetSchema[]>([]);
   const [editorTool, setEditorTool] = useState('platform');
   const [selectedEnemy, setSelectedEnemy] = useState<SelectedEnemyConfig>(DEFAULT_ENEMY_SELECTION);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
@@ -29,16 +28,7 @@ export function LevelEditor() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [completed, setCompleted] = useState(false);
-
-  const loadData = useCallback(async () => {
-    const [sk, as] = await Promise.all([api.skills.list(), api.assets.list()]);
-    setSkills(sk.map((s) => s.data));
-    setAssets(as.map((a) => a.data));
-  }, []);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  const { assets, skills, musicTracks, reload: reloadContent } = useGameContent();
 
   useEffect(() => {
     const key = levelId ?? 'draft';
@@ -201,13 +191,14 @@ export function LevelEditor() {
             levelName={levelName}
             onNameChange={setLevelName}
             onEditMusic={openMusicEditor}
+            musicTracks={musicTracks}
           />
           <SkillBuilder
             compact
             skills={skills}
             selectedSkillIds={level.skills}
             onSkillsChange={(ids) => setLevel({ ...level, skills: ids })}
-            onRefresh={loadData}
+            onRefresh={reloadContent}
             onManage={() => navigate('/skills')}
           />
         </aside>
@@ -217,6 +208,7 @@ export function LevelEditor() {
             level={level}
             skills={activeSkills}
             assets={assets}
+            musicTracks={musicTracks}
             mode={mode}
             editorTool={editorTool}
             selectedEnemy={selectedEnemy}

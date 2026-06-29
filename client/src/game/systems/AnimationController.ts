@@ -71,13 +71,17 @@ export class AnimationController {
 
   private playClip(clip: AssetAnimClip, allowFallback: boolean): void {
     const key = assetAnimKey(this.asset!, clip);
-    if (key && this.sprite.scene.anims.exists(key)) {
-      if (this.sprite.anims.currentAnim?.key !== key) {
-        this.sprite.play(key, true);
-        this.currentClip = clip;
+      if (key && this.sprite.scene.anims.exists(key)) {
+        if (this.sprite.anims.currentAnim?.key !== key) {
+          try {
+            this.sprite.play(key, true);
+            this.currentClip = clip;
+          } catch {
+            /* invalid anim frames — skip */
+          }
+        }
+        return;
       }
-      return;
-    }
     if (allowFallback && clip !== 'idle') {
       this.playClip('idle', false);
     }

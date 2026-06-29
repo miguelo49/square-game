@@ -11,16 +11,95 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/assets', async (request) => {
     const userId = request.user!.userId;
     const rows = db
-      .prepare('SELECT id, name, data, created_at FROM assets WHERE user_id = ? ORDER BY created_at DESC')
-      .all(userId) as Array<{ id: string; name: string; data: string; created_at: number }>;
+      .prepare(
+        `SELECT id, name, data, is_public, created_at FROM assets
+         WHERE user_id = ? ORDER BY created_at DESC`
+      )
+      .all(userId) as Array<{
+      id: string;
+      name: string;
+      data: string;
+      is_public: number;
+      created_at: number;
+    }>;
 
     return rows.map((r) => ({
       id: r.id,
       name: r.name,
       data: JSON.parse(r.data),
+      isPublic: r.is_public === 1,
       createdAt: r.created_at,
     }));
   });
+
+  app.get('/api/assets/public', async () => {
+    const rows = db
+      .prepare(
+        `SELECT a.id, a.name, a.data, a.created_at, u.nickname AS author_nickname
+         FROM assets a
+         JOIN users u ON u.id = a.user_id
+         WHERE a.is_public = 1
+         ORDER BY a.created_at DESC
+         LIMIT 200`
+      )
+      .all() as Array<{
+      id: string;
+      name: string;
+      data: string;
+      created_at: number;
+      author_nickname: string;
+    }>;
+
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      data: JSON.parse(r.data),
+      authorNickname: r.author_nickname,
+      createdAt: r.created_at,
+    }));
+  });
+
+  app.get<{ Params: { id: string } }>('/api/assets/:id', async (request, reply) => {
+    const userId = request.user!.userId;
+    const row = db
+      .prepare(
+        `SELECT id, name, data, is_public, user_id FROM assets
+         WHERE id = ? AND (user_id = ? OR is_public = 1)`
+      )
+      .get(request.params.id, userId) as
+      | { id: string; name: string; data: string; is_public: number; user_id: string }
+      | undefined;
+
+    if (!row) return reply.code(404).send({ error: 'Asset no encontrado' });
+
+    return {
+      id: row.id,
+      name: row.name,
+      data: JSON.parse(row.data),
+      isPublic: row.is_public === 1,
+    };
+  });
+
+  app.post<{ Params: { id: string } }>(
+    '/api/assets/:id/share',
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      const row = db
+        .prepare('SELECT id, is_public FROM assets WHERE id = ? AND user_id = ?')
+        .get(request.params.id, userId) as
+        | { id: string; is_public: number }
+        | undefined;
+
+      if (!row) return reply.code(404).send({ error: 'Asset no encontrado' });
+
+      const nextPublic = row.is_public === 1 ? 0 : 1;
+      db.prepare('UPDATE assets SET is_public = ? WHERE id = ?').run(
+        nextPublic,
+        request.params.id
+      );
+      return { isPublic: nextPublic === 1 };
+    }
+  );
 
   app.post<{ Body: { name?: string; data?: unknown } }>(
     '/api/assets',
@@ -203,7 +282,6 @@ const DOM_TO_PHASER: Record<string, string> = {
   ShiftRight: 'SHIFT',
 };
 
-/** Fix legacy DOM key codes in user-created skills */
 export function migrateSkillKeyCodes(): void {
   const rows = db.prepare('SELECT id, data FROM skills').all() as Array<{
     id: string;

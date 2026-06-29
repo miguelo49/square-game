@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
-import type { SkillSchema, SkillAction, SkillActionType, AssetSchema } from '../types';
+import { useGameContent } from '../hooks/useGameContent';
+import type { SkillSchema, SkillAction, SkillActionType } from '../types';
 import { KEY_OPTIONS, ACTION_OPTIONS } from '../data/retroLimits';
 import { api } from '../api/client';
 
@@ -9,21 +10,21 @@ const DEFAULT_ACTION = (): SkillAction => ({ type: 'jump', force: 420 });
 
 export function SkillsHub() {
   const navigate = useNavigate();
-  const [skills, setSkills] = useState<SkillSchema[]>([]);
-  const [assets, setAssets] = useState<AssetSchema[]>([]);
+  const { skills, assets, reload } = useGameContent();
+  const [skillPublic, setSkillPublic] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<SkillSchema | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  const load = async () => {
-    const [sk, as] = await Promise.all([api.skills.list(), api.assets.list()]);
-    setSkills(sk.map((s) => s.data));
-    setAssets(as.map((a) => a.data));
-  };
-
   useEffect(() => {
-    load();
-  }, []);
+    api.skills.list().then((list) => {
+      const map: Record<string, boolean> = {};
+      for (const s of list) {
+        if (!s.id.startsWith('skill_')) map[s.id] = s.isPublic ?? false;
+      }
+      setSkillPublic(map);
+    });
+  }, [skills]);
 
   const startNew = () => {
     setEditing({
@@ -84,7 +85,13 @@ export function SkillsHub() {
       }
       setMessage('Habilidad guardada!');
       setEditing(null);
-      await load();
+      await reload();
+      const list = await api.skills.list();
+      const map: Record<string, boolean> = {};
+      for (const s of list) {
+        if (!s.id.startsWith('skill_')) map[s.id] = s.isPublic ?? false;
+      }
+      setSkillPublic(map);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -94,7 +101,7 @@ export function SkillsHub() {
     if (id.startsWith('skill_')) return;
     await api.skills.delete(id);
     if (editing?.id === id) setEditing(null);
-    await load();
+    await reload();
   };
 
   const renderActionFields = (action: SkillAction, idx: number) => (
@@ -418,6 +425,20 @@ export function SkillsHub() {
                 <button className="retro-btn" onClick={saveSkill}>
                   Guardar
                 </button>
+                {!editing.id.startsWith('skill_') && skillPublic[editing.id] !== undefined && (
+                  <button
+                    className={`retro-btn ${skillPublic[editing.id] ? 'active' : ''}`}
+                    onClick={async () => {
+                      const res = await api.skills.share(editing.id);
+                      setSkillPublic((prev) => ({ ...prev, [editing.id]: res.isPublic }));
+                      setMessage(
+                        res.isPublic ? 'Skill compartida!' : 'Skill ya no es pública'
+                      );
+                    }}
+                  >
+                    {skillPublic[editing.id] ? 'Dejar de compartir' : 'Compartir'}
+                  </button>
+                )}
                 <button className="retro-btn secondary" onClick={() => setEditing(null)}>
                   Cancelar
                 </button>

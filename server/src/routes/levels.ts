@@ -2,6 +2,10 @@ import { v4 as uuidv4 } from 'uuid';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db.js';
 import { requireAuth } from '../auth/routes.js';
+import { canPlayLevel } from './levelAccess.js';
+
+const MIN_TIME_MS = 500;
+const MAX_TIME_MS = 3_600_000;
 
 export async function levelRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', requireAuth);
@@ -62,18 +66,225 @@ export async function levelRoutes(app: FastifyInstance): Promise<void> {
     }));
   });
 
+  app.get('/api/levels/favorites', async (request) => {
+    const userId = request.user!.userId;
+    const rows = db
+      .prepare(
+        `SELECT l.id, l.name, l.data, l.is_demo, l.is_public, f.created_at, u.nickname AS author_nickname
+         FROM level_favorites f
+         JOIN levels l ON l.id = f.level_id
+         JOIN users u ON u.id = l.user_id
+         WHERE f.user_id = ?
+         ORDER BY f.created_at DESC`
+      )
+      .all(userId) as Array<{
+      id: string;
+      name: string;
+      data: string;
+      is_demo: number;
+      is_public: number;
+      created_at: number;
+      author_nickname: string;
+    }>;
+
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      data: JSON.parse(r.data),
+      isDemo: r.is_demo === 1,
+      isPublic: r.is_public === 1,
+      authorNickname: r.author_nickname,
+      favoritedAt: r.created_at,
+    }));
+  });
+
+  app.get<{ Params: { id: string } }>(
+    '/api/levels/:id/leaderboard',
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      if (!canPlayLevel(request.params.id, userId)) {
+        return reply.code(404).send({ error: 'Nivel no encontrado' });
+      }
+
+      const rows = db
+        .prepare(
+          `SELECT u.nickname, s.time_ms, s.deaths, s.achieved_at
+           FROM level_best_scores s
+           JOIN users u ON u.id = s.user_id
+           WHERE s.level_id = ?
+           ORDER BY s.time_ms ASC
+           LIMIT 20`
+        )
+        .all(request.params.id) as Array<{
+        nickname: string;
+        time_ms: number;
+        deaths: number;
+        achieved_at: number;
+      }>;
+
+      return rows.map((r, i) => ({
+        rank: i + 1,
+        nickname: r.nickname,
+        timeMs: r.time_ms,
+        deaths: r.deaths,
+        achievedAt: r.achieved_at,
+      }));
+    }
+  );
+
+  app.get<{ Params: { id: string } }>(
+    '/api/levels/:id/score/me',
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      if (!canPlayLevel(request.params.id, userId)) {
+        return reply.code(404).send({ error: 'Nivel no encontrado' });
+      }
+
+      const row = db
+        .prepare(
+          `SELECT time_ms, deaths, achieved_at FROM level_best_scores
+           WHERE level_id = ? AND user_id = ?`
+        )
+        .get(request.params.id, userId) as
+        | { time_ms: number; deaths: number; achieved_at: number }
+        | undefined;
+
+      if (!row) return { timeMs: null, deaths: null, achievedAt: null };
+
+      return {
+        timeMs: row.time_ms,
+        deaths: row.deaths,
+        achievedAt: row.achieved_at,
+      };
+    }
+  );
+
+  app.post<{ Params: { id: string }; Body: { timeMs?: number; deaths?: number } }>(
+    '/api/levels/:id/score',
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      const levelId = request.params.id;
+      if (!canPlayLevel(levelId, userId)) {
+        return reply.code(404).send({ error: 'Nivel no encontrado' });
+      }
+
+      const { timeMs, deaths = 0 } = request.body ?? {};
+      if (typeof timeMs !== 'number' || timeMs < MIN_TIME_MS || timeMs > MAX_TIME_MS) {
+        return reply.code(400).send({ error: 'timeMs inválido' });
+      }
+
+      const existing = db
+        .prepare(
+          'SELECT time_ms FROM level_best_scores WHERE level_id = ? AND user_id = ?'
+        )
+        .get(levelId, userId) as { time_ms: number } | undefined;
+
+      const now = Math.floor(Date.now() / 1000);
+      let isPersonalBest = false;
+
+      if (!existing) {
+        db.prepare(
+          `INSERT INTO level_best_scores (level_id, user_id, time_ms, deaths, achieved_at)
+           VALUES (?, ?, ?, ?, ?)`
+        ).run(levelId, userId, timeMs, deaths, now);
+        isPersonalBest = true;
+      } else if (timeMs < existing.time_ms) {
+        db.prepare(
+          `UPDATE level_best_scores SET time_ms = ?, deaths = ?, achieved_at = ?
+           WHERE level_id = ? AND user_id = ?`
+        ).run(timeMs, deaths, now, levelId, userId);
+        isPersonalBest = true;
+      }
+
+      const rankRow = db
+        .prepare(
+          `SELECT COUNT(*) + 1 AS rank FROM level_best_scores
+           WHERE level_id = ? AND time_ms < ?`
+        )
+        .get(levelId, timeMs) as { rank: number };
+
+      return {
+        isPersonalBest,
+        rank: rankRow.rank,
+        inTop20: rankRow.rank <= 20,
+      };
+    }
+  );
+
+  app.post<{ Params: { id: string } }>(
+    '/api/levels/:id/favorite',
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      const levelId = request.params.id;
+      if (!canPlayLevel(levelId, userId)) {
+        return reply.code(404).send({ error: 'Nivel no encontrado' });
+      }
+
+      const existing = db
+        .prepare('SELECT 1 FROM level_favorites WHERE user_id = ? AND level_id = ?')
+        .get(userId, levelId);
+
+      if (existing) {
+        db.prepare('DELETE FROM level_favorites WHERE user_id = ? AND level_id = ?').run(
+          userId,
+          levelId
+        );
+        return { isFavorite: false };
+      }
+
+      db.prepare(
+        'INSERT INTO level_favorites (user_id, level_id) VALUES (?, ?)'
+      ).run(userId, levelId);
+      return { isFavorite: true };
+    }
+  );
+
+  app.post<{ Params: { id: string } }>(
+    '/api/levels/:id/share',
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      const row = db
+        .prepare(
+          'SELECT id, is_demo, is_public FROM levels WHERE id = ? AND user_id = ?'
+        )
+        .get(request.params.id, userId) as
+        | { id: string; is_demo: number; is_public: number }
+        | undefined;
+
+      if (!row) return reply.code(404).send({ error: 'Nivel no encontrado' });
+      if (row.is_demo === 1) {
+        return reply.code(400).send({ error: 'No se puede compartir el demo' });
+      }
+
+      const nextPublic = row.is_public === 1 ? 0 : 1;
+      const now = Math.floor(Date.now() / 1000);
+      db.prepare(
+        'UPDATE levels SET is_public = ?, updated_at = ? WHERE id = ?'
+      ).run(nextPublic, now, request.params.id);
+
+      return { isPublic: nextPublic === 1 };
+    }
+  );
+
   app.get<{ Params: { id: string } }>('/api/levels/:id', async (request, reply) => {
     const userId = request.user!.userId;
+    if (!canPlayLevel(request.params.id, userId)) {
+      return reply.code(404).send({ error: 'Nivel no encontrado' });
+    }
+
     const row = db
       .prepare(
-        `SELECT id, name, data, is_demo, is_public FROM levels
-         WHERE id = ? AND (user_id = ? OR is_demo = 1 OR is_public = 1)`
+        `SELECT id, name, data, is_demo, is_public FROM levels WHERE id = ?`
       )
-      .get(request.params.id, userId) as
+      .get(request.params.id) as
       | { id: string; name: string; data: string; is_demo: number; is_public: number }
       | undefined;
 
     if (!row) return reply.code(404).send({ error: 'Nivel no encontrado' });
+
+    const fav = db
+      .prepare('SELECT 1 FROM level_favorites WHERE user_id = ? AND level_id = ?')
+      .get(userId, request.params.id);
 
     return {
       id: row.id,
@@ -81,6 +292,7 @@ export async function levelRoutes(app: FastifyInstance): Promise<void> {
       data: JSON.parse(row.data),
       isDemo: row.is_demo === 1,
       isPublic: row.is_public === 1,
+      isFavorite: !!fav,
     };
   });
 
@@ -143,33 +355,6 @@ export async function levelRoutes(app: FastifyInstance): Promise<void> {
       }
 
       return { ok: true };
-    }
-  );
-
-  app.post<{ Params: { id: string } }>(
-    '/api/levels/:id/share',
-    async (request, reply) => {
-      const userId = request.user!.userId;
-      const row = db
-        .prepare(
-          'SELECT id, is_demo, is_public FROM levels WHERE id = ? AND user_id = ?'
-        )
-        .get(request.params.id, userId) as
-        | { id: string; is_demo: number; is_public: number }
-        | undefined;
-
-      if (!row) return reply.code(404).send({ error: 'Nivel no encontrado' });
-      if (row.is_demo === 1) {
-        return reply.code(400).send({ error: 'No se puede compartir el demo' });
-      }
-
-      const nextPublic = row.is_public === 1 ? 0 : 1;
-      const now = Math.floor(Date.now() / 1000);
-      db.prepare(
-        'UPDATE levels SET is_public = ?, updated_at = ? WHERE id = ?'
-      ).run(nextPublic, now, request.params.id);
-
-      return { isPublic: nextPublic === 1 };
     }
   );
 

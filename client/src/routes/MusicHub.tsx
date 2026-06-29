@@ -6,21 +6,22 @@ import { MusicEditor } from './MusicEditor';
 import { emptyMusicSchema } from '../audio/PolyMusicGenerator';
 import { downloadSqmusic, importSqmusic } from '../storage/compression';
 
-type TrackItem = { id: string; name: string; data: MusicSchema };
-
 export function MusicHub() {
   const navigate = useNavigate();
-  const [tracks, setTracks] = useState<TrackItem[]>([]);
+  const [tracks, setTracks] = useState<
+    Array<{ id: string; name: string; data: MusicSchema; isPublic?: boolean }>
+  >([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [trackName, setTrackName] = useState('Nueva pista');
   const [initialMusic, setInitialMusic] = useState<MusicSchema>(emptyMusicSchema());
   const [editorKey, setEditorKey] = useState(0);
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
+  const [isPublic, setIsPublic] = useState(false);
 
   const loadTracks = useCallback(async () => {
     const list = await api.music.list();
-    setTracks(list.map((t) => ({ id: t.id, name: t.name, data: t.data })));
+    setTracks(list.map((t) => ({ id: t.id, name: t.name, data: t.data, isPublic: t.isPublic })));
   }, []);
 
   useEffect(() => {
@@ -34,8 +35,9 @@ export function MusicHub() {
     setEditorKey((k) => k + 1);
   };
 
-  const loadTrack = (t: TrackItem) => {
+  const loadTrack = (t: (typeof tracks)[0]) => {
     setSelectedId(t.id);
+    setIsPublic(t.isPublic ?? false);
     setTrackName(t.name);
     setInitialMusic({ ...t.data, notes: [...t.data.notes] });
     setEditorKey((k) => k + 1);
@@ -95,6 +97,19 @@ export function MusicHub() {
         </button>
         <h2>Compositor de Música</h2>
         <div className="header-actions">
+          {selectedId && (
+            <button
+              className={`retro-btn ${isPublic ? 'active' : ''}`}
+              onClick={async () => {
+                const res = await api.music.share(selectedId);
+                setIsPublic(res.isPublic);
+                setMessage(res.isPublic ? 'Pista compartida!' : 'Pista ya no es pública');
+                await loadTracks();
+              }}
+            >
+              {isPublic ? 'Dejar de compartir' : 'Compartir'}
+            </button>
+          )}
           <button className="retro-btn" onClick={startNew}>
             + Nueva
           </button>

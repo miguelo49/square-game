@@ -58,12 +58,23 @@ export const api = {
           authorNickname: string;
         }>
       >('/levels/public'),
+    listFavorites: () =>
+      request<
+        Array<{
+          id: string;
+          name: string;
+          data: import('../types').LevelSchema;
+          isDemo: boolean;
+          authorNickname: string;
+        }>
+      >('/levels/favorites'),
     get: (id: string) =>
       request<{
         id: string;
         name: string;
         data: import('../types').LevelSchema;
         isPublic?: boolean;
+        isFavorite?: boolean;
       }>(`/levels/${id}`),
     create: (name: string, data: import('../types').LevelSchema) =>
       request<{ id: string }>('/levels', {
@@ -79,12 +90,45 @@ export const api = {
       request<{ ok: boolean }>(`/levels/${id}`, { method: 'DELETE' }),
     share: (id: string) =>
       request<{ isPublic: boolean }>(`/levels/${id}/share`, { method: 'POST' }),
+    favorite: (id: string) =>
+      request<{ isFavorite: boolean }>(`/levels/${id}/favorite`, { method: 'POST' }),
+    leaderboard: (id: string) =>
+      request<import('../types').LeaderboardEntry[]>(`/levels/${id}/leaderboard`),
+    myScore: (id: string) =>
+      request<{
+        timeMs: number | null;
+        deaths: number | null;
+        achievedAt: number | null;
+      }>(`/levels/${id}/score/me`),
+    submitScore: (id: string, timeMs: number, deaths: number) =>
+      request<{ isPersonalBest: boolean; rank: number; inTop20: boolean }>(
+        `/levels/${id}/score`,
+        { method: 'POST', body: JSON.stringify({ timeMs, deaths }) }
+      ),
   },
   assets: {
     list: () =>
       request<
-        Array<{ id: string; name: string; data: import('../types').AssetSchema }>
+        Array<{
+          id: string;
+          name: string;
+          data: import('../types').AssetSchema;
+          isPublic?: boolean;
+        }>
       >('/assets'),
+    listPublic: () =>
+      request<
+        Array<{
+          id: string;
+          name: string;
+          data: import('../types').AssetSchema;
+          authorNickname: string;
+        }>
+      >('/assets/public'),
+    get: (id: string) =>
+      request<{ id: string; name: string; data: import('../types').AssetSchema }>(
+        `/assets/${id}`
+      ),
     create: (name: string, data: import('../types').AssetSchema) =>
       request<{ id: string }>('/assets', {
         method: 'POST',
@@ -97,12 +141,28 @@ export const api = {
       }),
     delete: (id: string) =>
       request<{ ok: boolean }>(`/assets/${id}`, { method: 'DELETE' }),
+    share: (id: string) =>
+      request<{ isPublic: boolean }>(`/assets/${id}/share`, { method: 'POST' }),
   },
   skills: {
     list: () =>
       request<
-        Array<{ id: string; name: string; data: import('../types').SkillSchema }>
+        Array<{
+          id: string;
+          name: string;
+          data: import('../types').SkillSchema;
+          isPublic?: boolean;
+        }>
       >('/skills'),
+    listPublic: () =>
+      request<
+        Array<{
+          id: string;
+          name: string;
+          data: import('../types').SkillSchema;
+          authorNickname: string;
+        }>
+      >('/skills/public'),
     create: (name: string, data: import('../types').SkillSchema) =>
       request<{ id: string }>('/skills', {
         method: 'POST',
@@ -115,12 +175,28 @@ export const api = {
       }),
     delete: (id: string) =>
       request<{ ok: boolean }>(`/skills/${id}`, { method: 'DELETE' }),
+    share: (id: string) =>
+      request<{ isPublic: boolean }>(`/skills/${id}/share`, { method: 'POST' }),
   },
   music: {
     list: () =>
       request<
-        Array<{ id: string; name: string; data: import('../types').MusicSchema }>
+        Array<{
+          id: string;
+          name: string;
+          data: import('../types').MusicSchema;
+          isPublic?: boolean;
+        }>
       >('/music'),
+    listPublic: () =>
+      request<
+        Array<{
+          id: string;
+          name: string;
+          data: import('../types').MusicSchema;
+          authorNickname: string;
+        }>
+      >('/music/public'),
     create: (name: string, data: import('../types').MusicSchema) =>
       request<{ id: string }>('/music', {
         method: 'POST',
@@ -133,5 +209,7 @@ export const api = {
       }),
     delete: (id: string) =>
       request<{ ok: boolean }>(`/music/${id}`, { method: 'DELETE' }),
+    share: (id: string) =>
+      request<{ isPublic: boolean }>(`/music/${id}/share`, { method: 'POST' }),
   },
 };

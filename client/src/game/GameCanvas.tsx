@@ -1,9 +1,10 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import Phaser from 'phaser';
 import { createPhaserConfig } from './PhaserGame';
 import { GameScene } from './scenes/GameScene';
 import { MusicPlayer } from '../audio/MusicPlayer';
-import type { LevelSchema, SkillSchema, AssetSchema, GameMode, SelectedEnemyConfig } from '../types';
+import type { LevelSchema, SkillSchema, AssetSchema, GameMode, SelectedEnemyConfig, RunResult } from '../types';
+import type { MusicTrackRef } from '../hooks/useGameContent';
 
 interface GameCanvasProps {
   level: LevelSchema;
@@ -16,7 +17,8 @@ interface GameCanvasProps {
   onLevelChange?: (level: LevelSchema) => void;
   onEditorSelect?: (type: string, id: string) => void;
   onDeath?: () => void;
-  onWin?: () => void;
+  onWin?: (result: RunResult) => void;
+  musicTracks?: MusicTrackRef[];
 }
 
 export function GameCanvas({
@@ -31,10 +33,12 @@ export function GameCanvas({
   onEditorSelect,
   onDeath,
   onWin,
+  musicTracks = [],
 }: GameCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
   const musicRef = useRef<MusicPlayer | null>(null);
+  const bootedRef = useRef(false);
   const propsRef = useRef({
     level,
     skills,
@@ -61,6 +65,16 @@ export function GameCanvas({
     onEditorSelect,
   };
 
+  const levelKey = useMemo(() => JSON.stringify(level), [level]);
+  const skillsKey = useMemo(
+    () => skills.map((s) => s.id).join(','),
+    [skills]
+  );
+  const assetsKey = useMemo(
+    () => assets.map((a) => a.id).join(','),
+    [assets]
+  );
+
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -69,8 +83,10 @@ export function GameCanvas({
     config.scene = [GameScene];
     const game = new Phaser.Game(config);
     gameRef.current = game;
+    bootedRef.current = false;
 
     const startScene = () => {
+      bootedRef.current = true;
       const p = propsRef.current;
       game.scene.start('GameScene', {
         level: p.level,
@@ -81,9 +97,10 @@ export function GameCanvas({
         selectedEnemy: p.selectedEnemy,
         selectedEntityId: p.selectedEntityId,
         callbacks: {
-          onDeath: p.onDeath,
-          onWin: p.onWin,
-          onEditorSelect: p.onEditorSelect,
+          onDeath: () => propsRef.current.onDeath?.(),
+          onWin: (result: RunResult) => propsRef.current.onWin?.(result),
+          onEditorSelect: (type: string, id: string) =>
+            propsRef.current.onEditorSelect?.(type, id),
         },
       });
     };
@@ -108,12 +125,14 @@ export function GameCanvas({
       if (onLevelChange) game.events.off('level-changed', onLevelChange);
       game.destroy(true);
       gameRef.current = null;
+      bootedRef.current = false;
     };
   }, [onLevelChange]);
 
-  const restartScene = useCallback(() => {
+  useEffect(() => {
     const game = gameRef.current;
-    if (!game?.isBooted) return;
+    if (!game?.isBooted || !bootedRef.current) return;
+
     const p = propsRef.current;
     const scene = game.scene.getScene('GameScene');
     const payload = {
@@ -125,25 +144,23 @@ export function GameCanvas({
       selectedEnemy: p.selectedEnemy,
       selectedEntityId: p.selectedEntityId,
       callbacks: {
-        onDeath: p.onDeath,
-        onWin: p.onWin,
-        onEditorSelect: p.onEditorSelect,
+        onDeath: () => propsRef.current.onDeath?.(),
+        onWin: (result: RunResult) => propsRef.current.onWin?.(result),
+        onEditorSelect: (type: string, id: string) =>
+          propsRef.current.onEditorSelect?.(type, id),
       },
     };
+
     if (scene?.scene.isActive()) {
       scene.scene.restart(payload);
     } else {
       game.scene.start('GameScene', payload);
     }
-  }, []);
-
-  useEffect(() => {
-    restartScene();
-  }, [level, skills, assets, mode, editorTool, onDeath, onWin, restartScene]);
+  }, [levelKey, skillsKey, assetsKey, mode, editorTool]);
 
   useEffect(() => {
     const game = gameRef.current;
-    if (!game?.isBooted || !selectedEnemy) return;
+    if (!game?.isBooted) return;
     const scene = game.scene.getScene('GameScene');
     scene?.events.emit('set-selected-enemy', selectedEnemy);
   }, [selectedEnemy]);
@@ -160,7 +177,12 @@ export function GameCanvas({
     const player = musicRef.current;
 
     if (mode === 'play') {
-      if (level.music) {
+      const track = level.musicTrackId
+        ? musicTracks.find((t) => t.id === level.musicTrackId)
+        : undefined;
+      if (track) {
+        void player.playSchema(track.data);
+      } else if (level.music) {
         void player.playSchema(level.music);
       } else if (level.musicSeed != null) {
         void player.play(level.musicSeed);
@@ -172,7 +194,7 @@ export function GameCanvas({
     }
 
     return () => player.stop();
-  }, [mode, level.music, level.musicSeed]);
+  }, [mode, level.music, level.musicSeed, level.musicTrackId, musicTracks]);
 
   return (
     <div

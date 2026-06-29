@@ -791,3 +791,99 @@ label {
   flex-direction: column;
   gap: 4px;
 }
+
+.speedrun-hud {
+  font-family: var(--font);
+  font-size: 10px;
+  color: var(--accent);
+  margin-left: 12px;
+}
+
+.leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 8px;
+  margin-top: 8px;
+}
+
+.leaderboard-table th,
+.leaderboard-table td {
+  border: 1px solid var(--border);
+  padding: 4px 6px;
+  text-align: left;
+}
+
+.leaderboard-table th {
+  background: var(--panel);
+}
+
+.leaderboard-me {
+  background: rgba(255, 220, 100, 0.15);
+  color: var(--accent);
+}
+
+.favorite-btn.active {
+  border-color: gold;
+  color: gold;
+}
+
+.level-sidebar-meta {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 2px solid var(--border);
+}
+
+.my-best {
+  font-size: 8px;
+  margin: 8px 0;
+  color: var(--accent);
+}
+
+.post-win-actions {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+}
+
+.community-page {
+  min-height: 100vh;
+  padding: 16px;
+}
+
+.community-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.community-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.community-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.community-card,
+.community-asset-card {
+  border: 2px solid var(--border);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--panel);
+}
+
+.community-asset-card canvas {
+  image-rendering: pixelated;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+}

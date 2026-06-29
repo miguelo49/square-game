@@ -73,6 +73,47 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_music_user ON music_tracks(user_id);
 `);
 
+const assetCols = db.prepare('PRAGMA table_info(assets)').all() as Array<{ name: string }>;
+if (!assetCols.some((c) => c.name === 'is_public')) {
+  db.exec(`ALTER TABLE assets ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0;`);
+}
+db.exec(`CREATE INDEX IF NOT EXISTS idx_assets_public ON assets(is_public);`);
+
+const skillCols = db.prepare('PRAGMA table_info(skills)').all() as Array<{ name: string }>;
+if (!skillCols.some((c) => c.name === 'is_public')) {
+  db.exec(`ALTER TABLE skills ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0;`);
+}
+db.exec(`CREATE INDEX IF NOT EXISTS idx_skills_public ON skills(is_public);`);
+
+const musicCols = db.prepare('PRAGMA table_info(music_tracks)').all() as Array<{ name: string }>;
+if (!musicCols.some((c) => c.name === 'is_public')) {
+  db.exec(`ALTER TABLE music_tracks ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0;`);
+}
+if (!musicCols.some((c) => c.name === 'updated_at')) {
+  db.exec(`ALTER TABLE music_tracks ADD COLUMN updated_at INTEGER NOT NULL DEFAULT (unixepoch());`);
+}
+db.exec(`CREATE INDEX IF NOT EXISTS idx_music_public ON music_tracks(is_public);`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS level_favorites (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    level_id TEXT NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    PRIMARY KEY (user_id, level_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS level_best_scores (
+    level_id TEXT NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    time_ms INTEGER NOT NULL,
+    deaths INTEGER NOT NULL DEFAULT 0,
+    achieved_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    PRIMARY KEY (level_id, user_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_scores_level_time ON level_best_scores(level_id, time_ms);
+`);
+
 export interface UserRow {
   id: string;
   nickname: string;

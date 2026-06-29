@@ -161,3 +161,24 @@ export interface EditorSelection {
   type: 'enemy';
   id: string;
 }
+
+export interface LeaderboardEntry {
+  rank: number;
+  nickname: string;
+  timeMs: number;
+  deaths: number;
+  achievedAt: number;
+}
+
+export interface RunResult {
+  timeMs: number;
+  deaths: number;
+}
+
+export interface MusicTrackItem {
+  id: string;
+  name: string;
+  data: MusicSchema;
+  isPublic?: boolean;
+  authorNickname?: string;
+}

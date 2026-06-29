@@ -1,3 +1,5 @@
+import Phaser from 'phaser';
+
 /** Maps DOM KeyboardEvent.code / legacy values to Phaser KeyCodes names */
 const DOM_TO_PHASER: Record<string, string> = {
   ArrowLeft: 'LEFT',
@@ -18,7 +20,15 @@ const DOM_TO_PHASER: Record<string, string> = {
 };
 
 export function toPhaserKey(key: string): string {
-  return DOM_TO_PHASER[key] ?? key;
+  if (DOM_TO_PHASER[key]) return DOM_TO_PHASER[key]!;
+  const upper = key.toUpperCase();
+  return upper;
+}
+
+export function resolvePhaserKeyCode(key: string): number {
+  const name = toPhaserKey(key);
+  const codes = Phaser.Input.Keyboard.KeyCodes as Record<string, number>;
+  return codes[name] ?? codes[key] ?? codes.SPACE;
 }
 
 export const GAME_CAPTURE_KEYS = [
@@ -31,4 +41,7 @@ export const GAME_CAPTURE_KEYS = [
   'D',
   'W',
   'S',
+  'SHIFT',
+  'Z',
+  'X',
 ] as const;

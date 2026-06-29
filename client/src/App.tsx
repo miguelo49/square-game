@@ -9,6 +9,7 @@ import { AssetEditor } from './routes/AssetEditor';
 import { MusicHub } from './routes/MusicHub';
 import { MusicEditorPage } from './routes/MusicEditor';
 import { SkillsHub } from './routes/SkillsHub';
+import { CommunityPage } from './routes/CommunityPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore();
@@ -88,6 +89,14 @@ function App() {
           element={
             <ProtectedRoute>
               <SkillsHub />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/community"
+          element={
+            <ProtectedRoute>
+              <CommunityPage />
             </ProtectedRoute>
           }
         />

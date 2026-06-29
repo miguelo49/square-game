@@ -14,6 +14,9 @@ export function MainMenu() {
         <button className="retro-btn menu-btn" onClick={() => navigate('/play')}>
           Jugar Niveles
         </button>
+        <button className="retro-btn menu-btn" onClick={() => navigate('/community')}>
+          Comunidad
+        </button>
         <button className="retro-btn menu-btn" onClick={() => navigate('/editor')}>
           Crear Nivel
         </button>

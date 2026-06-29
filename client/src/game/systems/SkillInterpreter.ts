@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { SkillSchema } from '../../types';
-import { toPhaserKey } from '../utils/phaserKeys';
+import { resolvePhaserKeyCode } from '../utils/phaserKeys';
 import type { ProjectileManager } from './ProjectileManager';
 import type { AnimationController } from './AnimationController';
 
@@ -48,8 +48,8 @@ export class SkillInterpreter {
     if (!this.scene.input.keyboard) return;
 
     for (const skill of skills) {
-      const phaserKey = toPhaserKey(skill.trigger.key);
-      const key = this.scene.input.keyboard.addKey(phaserKey);
+      const keyCode = resolvePhaserKeyCode(skill.trigger.key);
+      const key = this.scene.input.keyboard.addKey(keyCode);
       this.keys.set(skill.id, key);
     }
   }

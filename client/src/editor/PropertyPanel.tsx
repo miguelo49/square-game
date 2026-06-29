@@ -1,4 +1,5 @@
 import type { LevelSchema } from '../types';
+import type { MusicTrackRef } from '../hooks/useGameContent';
 import { estimateLevelSize } from '../storage/compression';
 import { MusicPlayer } from '../audio/MusicPlayer';
 import { useEffect, useRef, useState } from 'react';
@@ -9,6 +10,7 @@ interface PropertyPanelProps {
   levelName: string;
   onNameChange: (name: string) => void;
   onEditMusic?: () => void;
+  musicTracks?: MusicTrackRef[];
 }
 
 export function PropertyPanel({
@@ -17,6 +19,7 @@ export function PropertyPanel({
   levelName,
   onNameChange,
   onEditMusic,
+  musicTracks = [],
 }: PropertyPanelProps) {
   const size = estimateLevelSize(level);
   const previewPlayer = useRef<MusicPlayer | null>(null);
@@ -58,7 +61,21 @@ export function PropertyPanel({
     }
   };
 
-  const hasMusic = level.music != null || level.musicSeed != null;
+  const hasMusic =
+    level.music != null || level.musicSeed != null || level.musicTrackId != null;
+
+  const selectTrack = (trackId: string) => {
+    if (!trackId) {
+      const next = { ...level };
+      delete next.musicTrackId;
+      onChange(next);
+      return;
+    }
+    const next = { ...level, musicTrackId: trackId };
+    delete next.music;
+    delete next.musicSeed;
+    onChange(next);
+  };
 
   return (
     <div className="property-panel">
@@ -103,12 +120,31 @@ export function PropertyPanel({
       <div className="music-panel">
         <h4>Música</h4>
         <p className="music-seed">
-          {level.music
-            ? `Composición (${level.music.notes.length} notas)`
-            : level.musicSeed != null
-              ? `Seed: ${level.musicSeed}`
-              : 'Sin música'}
+          {level.musicTrackId
+            ? `Pista: ${musicTracks.find((t) => t.id === level.musicTrackId)?.name ?? level.musicTrackId}`
+            : level.music
+              ? `Composición (${level.music.notes.length} notas)`
+              : level.musicSeed != null
+                ? `Seed: ${level.musicSeed}`
+                : 'Sin música'}
         </p>
+        {musicTracks.length > 0 && (
+          <label>
+            Pista de biblioteca
+            <select
+              className="retro-input"
+              value={level.musicTrackId ?? ''}
+              onChange={(e) => selectTrack(e.target.value)}
+            >
+              <option value="">— Ninguna —</option>
+              {musicTracks.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <div className="btn-row">
           {onEditMusic && (
             <button type="button" className="retro-btn small" onClick={onEditMusic}>

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { LevelSchema, SkillSchema, AssetSchema, GameMode, SelectedEnemyConfig } from '../../types';
+import type { LevelSchema, SkillSchema, AssetSchema, GameMode, SelectedEnemyConfig, RunResult } from '../../types';
 import { CameraController } from '../systems/CameraController';
 import { EditorGrid } from '../systems/EditorGrid';
 import { EditorGhost } from '../systems/EditorGhost';
@@ -24,7 +24,7 @@ import { GRID_SNAP } from '../../data/retroLimits';
 
 export interface GameSceneCallbacks {
   onDeath?: () => void;
-  onWin?: () => void;
+  onWin?: (result: RunResult) => void;
   onEditorSelect?: (type: string, id: string) => void;
 }
 
@@ -63,6 +63,8 @@ export class GameScene extends Phaser.Scene {
   private playerAnimCtrl?: AnimationController | null;
   private projectileManager?: ProjectileManager;
   private won = false;
+  private runStartedAt = 0;
+  private deathCount = 0;
 
   constructor() {
     super('GameScene');
@@ -87,6 +89,8 @@ export class GameScene extends Phaser.Scene {
     this.selectedEnemy = data.selectedEnemy ?? DEFAULT_ENEMY_SELECTION;
     this.selectedEntityId = data.selectedEntityId ?? null;
     this.won = false;
+    this.runStartedAt = Date.now();
+    this.deathCount = 0;
   }
 
   create(): void {
@@ -98,10 +102,6 @@ export class GameScene extends Phaser.Scene {
     this.deleteHighlight = undefined;
     this.selectionHighlight?.destroy();
     this.selectionHighlight = undefined;
-    if (this.projectileManager) {
-      this.projectileManager.destroy();
-      this.projectileManager = undefined;
-    }
     this.playerAnimCtrl = undefined;
     this.portalZone?.destroy(true);
     this.portalZone = undefined;
@@ -172,6 +172,7 @@ export class GameScene extends Phaser.Scene {
     this.skillInterpreter.loadSkills(this.skills);
 
     if (this.mode === 'play') {
+      this.input.keyboard?.clearCaptures();
       this.projectileManager = new ProjectileManager(this);
       this.projectileManager.setAssets(this.assets);
       this.skillInterpreter.setProjectileManager(this.projectileManager);
@@ -565,6 +566,7 @@ export class GameScene extends Phaser.Scene {
 
   private handleDeath(): void {
     if (this.won) return;
+    this.deathCount++;
     this.player.setPosition(this.level.spawn.x, this.level.spawn.y);
     this.player.setVelocity(0, 0);
     this.callbacks.onDeath?.();
@@ -574,11 +576,16 @@ export class GameScene extends Phaser.Scene {
     if (this.won) return;
     this.won = true;
     this.player.setVelocity(0, 0);
-    this.callbacks.onWin?.();
+    const timeMs = Date.now() - this.runStartedAt;
+    this.callbacks.onWin?.({ timeMs, deaths: this.deathCount });
+  }
+
+  getRunElapsedMs(): number {
+    return Date.now() - this.runStartedAt;
   }
 
   update(_time: number, delta: number): void {
-    if (this.mode === 'play' && !this.won) {
+    if (this.mode === 'play' && !this.won && this.skillInterpreter) {
       this.skillInterpreter.update(_time, delta);
       this.skillInterpreter.applyFriction();
       this.playerAnimCtrl?.update(_time);

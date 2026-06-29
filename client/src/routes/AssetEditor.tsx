@@ -22,6 +22,7 @@ export function AssetEditor() {
   );
   const [assets, setAssets] = useState<Array<{ id: string; name: string; data: AssetSchema }>>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isPublic, setIsPublic] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -36,6 +37,7 @@ export function AssetEditor() {
     setAnimations(empty.animations);
     setPaletteSlots(empty.paletteSlots);
     setEditingId(null);
+    setIsPublic(false);
   };
 
   const handleSizeChange = (s: number) => {
@@ -101,8 +103,9 @@ export function AssetEditor() {
     }
   };
 
-  const loadAsset = (a: { id: string; name: string; data: AssetSchema }) => {
+  const loadAsset = (a: { id: string; name: string; data: AssetSchema; isPublic?: boolean }) => {
     setEditingId(a.id);
+    setIsPublic(a.isPublic ?? false);
     setName(a.name);
     setCategory(a.data.category);
     setSize(a.data.width);
@@ -128,9 +131,23 @@ export function AssetEditor() {
           ← Menú
         </button>
         <h2>Crear Assets</h2>
-        <button className="retro-btn primary" onClick={handleSave}>
-          Guardar Asset
-        </button>
+        <div className="header-actions">
+          {editingId && (
+            <button
+              className={`retro-btn ${isPublic ? 'active' : ''}`}
+              onClick={async () => {
+                const res = await api.assets.share(editingId);
+                setIsPublic(res.isPublic);
+                setMessage(res.isPublic ? 'Asset compartido!' : 'Asset ya no es público');
+              }}
+            >
+              {isPublic ? 'Dejar de compartir' : 'Compartir'}
+            </button>
+          )}
+          <button className="retro-btn primary" onClick={handleSave}>
+            Guardar Asset
+          </button>
+        </div>
       </header>
 
       {message && <p className="toast">{message}</p>}

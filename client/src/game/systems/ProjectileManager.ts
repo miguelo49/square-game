@@ -10,10 +10,11 @@ interface Projectile {
 
 export class ProjectileManager {
   private scene: Phaser.Scene;
-  private group: Phaser.Physics.Arcade.Group;
+  private group: Phaser.Physics.Arcade.Group | null = null;
   private projectiles: Projectile[] = [];
   private assets: AssetSchema[] = [];
   private enemies: TriangleEnemy[] = [];
+  private destroyed = false;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -29,6 +30,7 @@ export class ProjectileManager {
     platforms: Phaser.Physics.Arcade.StaticGroup,
     enemies: TriangleEnemy[]
   ): void {
+    if (!this.group || this.destroyed) return;
     this.enemies = enemies;
     this.scene.physics.add.collider(this.group, platforms, (obj) => {
       this.destroyProjectile(obj as Phaser.Physics.Arcade.Sprite);
@@ -49,6 +51,7 @@ export class ProjectileManager {
     speed = 400,
     lifeMs = 2000
   ): void {
+    if (!this.group || this.destroyed) return;
     let tex = 'projectile-default';
     if (assetId) {
       const asset = this.assets.find((a) => a.id === assetId);
@@ -71,31 +74,32 @@ export class ProjectileManager {
   private destroyProjectile(sprite: Phaser.Physics.Arcade.Sprite): void {
     const idx = this.projectiles.findIndex((p) => p.sprite === sprite);
     if (idx >= 0) this.projectiles.splice(idx, 1);
-    sprite.destroy();
+    if (sprite.active) sprite.destroy();
   }
 
   update(delta: number): void {
+    if (this.destroyed) return;
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i]!;
       p.life -= delta;
       if (p.life <= 0) {
-        p.sprite.destroy();
+        if (p.sprite.active) p.sprite.destroy();
         this.projectiles.splice(i, 1);
       }
     }
   }
 
   destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
     for (const p of this.projectiles) {
-      if (p.sprite?.active) p.sprite.destroy();
+      try {
+        if (p.sprite?.active) p.sprite.destroy();
+      } catch {
+        /* sprite already destroyed with scene */
+      }
     }
     this.projectiles = [];
-    if (!this.group) return;
-    try {
-      this.group.clear(true, true);
-      this.group.destroy(true);
-    } catch {
-      /* group already torn down with scene restart */
-    }
+    this.group = null;
   }
 }
